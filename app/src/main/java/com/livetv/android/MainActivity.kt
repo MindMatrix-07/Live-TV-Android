@@ -8,9 +8,12 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -20,6 +23,7 @@ import com.livetv.android.databinding.ActivityMainBinding
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private lateinit var androidLogsBridge: AndroidLogsBridge
     private val directStreamInterceptor = DirectStreamInterceptor(TARGET_HOST)
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -28,6 +32,8 @@ class MainActivity : AppCompatActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        androidLogsBridge = AndroidLogsBridge(this)
+        DebugLogStore.add("MainActivity", "App created")
 
         setupWebView()
     }
@@ -72,7 +78,17 @@ class MainActivity : AppCompatActivity() {
             isVerticalScrollBarEnabled = false
             isHorizontalScrollBarEnabled = false
             setInitialScale(100)
-            webChromeClient = WebChromeClient()
+            addJavascriptInterface(androidLogsBridge, "AndroidLogs")
+            webChromeClient = object : WebChromeClient() {
+                override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                    val source = consoleMessage.sourceId()?.substringAfterLast('/') ?: "inline"
+                    DebugLogStore.add(
+                        "WebConsole",
+                        "${consoleMessage.messageLevel()} $source:${consoleMessage.lineNumber()} ${consoleMessage.message()}",
+                    )
+                    return super.onConsoleMessage(consoleMessage)
+                }
+            }
 
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
@@ -86,6 +102,7 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                     super.onPageStarted(view, url, favicon)
+                    DebugLogStore.add("WebView", "Page started ${url ?: "unknown"}")
                     view?.evaluateJavascript(
                         """
                         (function () {
@@ -100,10 +117,41 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
+                    DebugLogStore.add("WebView", "Page finished ${url ?: "unknown"}")
                     view?.let { injectAndroidTvShell(it) }
+                }
+
+                override fun onReceivedError(
+                    view: WebView?,
+                    request: WebResourceRequest?,
+                    error: WebResourceError?,
+                ) {
+                    super.onReceivedError(view, request, error)
+                    if (request?.isForMainFrame == true || request?.url?.host == TARGET_HOST) {
+                        DebugLogStore.add(
+                            "WebView",
+                            "Request error ${request.url} code=${error?.errorCode} desc=${error?.description ?: "unknown"}",
+                        )
+                    }
+                }
+
+                override fun onReceivedHttpError(
+                    view: WebView?,
+                    request: WebResourceRequest?,
+                    errorResponse: WebResourceResponse?,
+                ) {
+                    super.onReceivedHttpError(view, request, errorResponse)
+                    val url = request?.url?.toString().orEmpty()
+                    if (request?.isForMainFrame == true || url.contains("/api/")) {
+                        DebugLogStore.add(
+                            "WebView",
+                            "HTTP ${errorResponse?.statusCode ?: -1} ${request?.method ?: "GET"} $url",
+                        )
+                    }
                 }
             }
 
+            DebugLogStore.add("WebView", "Loading $TARGET_URL")
             loadUrl(TARGET_URL)
         }
     }
@@ -128,6 +176,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        DebugLogStore.add("MainActivity", "App destroyed")
         with(binding.webView) {
             stopLoading()
             clearHistory()
@@ -212,6 +261,11 @@ class MainActivity : AppCompatActivity() {
 
                 body.android-tv-shell .channel-time {
                   font-size: clamp(0.9rem, calc(1.1rem * var(--android-tv-scale)), 1.25rem) !important;
+                }
+
+                body.android-tv-shell .debug-log-button {
+                  font-size: clamp(0.5rem, calc(0.52rem * var(--android-tv-scale)), 0.68rem) !important;
+                  padding: calc(5px * var(--android-tv-scale)) calc(10px * var(--android-tv-scale)) !important;
                 }
 
                 body.android-tv-shell .epg-list {

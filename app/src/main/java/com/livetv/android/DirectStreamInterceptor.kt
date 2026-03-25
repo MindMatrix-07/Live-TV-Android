@@ -40,10 +40,15 @@ class DirectStreamInterceptor(
         }
 
         return try {
+            debug("Resolve request for $rawUrl")
             val payload = resolveDirectStream(rawUrl)
+            debug(
+                "Resolve success channel=${payload.optString("channelId")} type=${payload.optString("streamType")} manifest=${payload.optString("manifestUrl")}",
+            )
             jsonResponse(200, payload.toString())
         } catch (error: Exception) {
             Log.e(TAG, "Direct stream resolution failed", error)
+            debug("Resolve failed for $rawUrl", error)
             jsonResponse(
                 500,
                 JSONObject()
@@ -61,6 +66,7 @@ class DirectStreamInterceptor(
         }
 
         return try {
+            debug("Proxy request ${request.method ?: "GET"} $rawTargetUrl")
             if (rawTargetUrl.startsWith("data:", ignoreCase = true)) {
                 handleDataUrl(rawTargetUrl)
             } else {
@@ -68,6 +74,7 @@ class DirectStreamInterceptor(
             }
         } catch (error: Exception) {
             Log.e(TAG, "Direct stream proxy failed", error)
+            debug("Proxy failed for $rawTargetUrl", error)
             jsonResponse(
                 502,
                 JSONObject()
@@ -114,6 +121,7 @@ class DirectStreamInterceptor(
         )
 
         val initial = fetchBytes(catalogUrl, "GET", baseHeaders)
+        debug("Catalog initial fetch ${initial.statusCode} $catalogUrl")
         if (initial.statusCode !in 200..299) {
             throw IllegalStateException("Catalog fetch failed: ${initial.statusCode}")
         }
@@ -124,11 +132,13 @@ class DirectStreamInterceptor(
         } catch (_jsonError: Exception) {
             val challenge = parseChallengeHtml(initialText, appendQueryParam(catalogUrl, "i", "1"))
                 ?: throw IllegalStateException("Unexpected catalog response")
+            debug("Catalog cookie challenge detected for $catalogUrl")
 
             val retryHeaders = LinkedHashMap(baseHeaders)
             retryHeaders["Cookie"] = "__test=${challenge.cookieValue}"
 
             val retry = fetchBytes(challenge.targetUrl, "GET", retryHeaders)
+            debug("Catalog challenge retry ${retry.statusCode} ${challenge.targetUrl}")
             if (retry.statusCode !in 200..299) {
                 throw IllegalStateException("Catalog challenge retry failed: ${retry.statusCode}")
             }
@@ -179,6 +189,9 @@ class DirectStreamInterceptor(
         request.requestHeaders["Range"]?.let { requestHeaders["Range"] = it }
 
         val upstream = fetchBytes(rawTargetUrl, request.method ?: "GET", requestHeaders)
+        if (shouldLogProxyResult(rawTargetUrl, upstream.statusCode)) {
+            debug("Proxy upstream ${upstream.statusCode} ${request.method ?: "GET"} $rawTargetUrl")
+        }
         val bodyStream = ByteArrayInputStream(upstream.body)
         val mimeType = upstream.headers["Content-Type"]?.substringBefore(';') ?: "application/octet-stream"
         val encoding = upstream.headers["Content-Type"]?.substringAfter("charset=", "utf-8") ?: "utf-8"
@@ -376,6 +389,20 @@ class DirectStreamInterceptor(
                 address.isSiteLocalAddress ||
                 address.isLinkLocalAddress
         } ?: false
+    }
+
+    private fun shouldLogProxyResult(url: String, statusCode: Int): Boolean {
+        if (statusCode >= 400) return true
+        val lower = url.lowercase()
+        return lower.contains(".mpd") ||
+            lower.contains(".m3u8") ||
+            lower.contains("manifest") ||
+            lower.contains("license") ||
+            lower.contains("clearkey")
+    }
+
+    private fun debug(message: String, error: Throwable? = null) {
+        DebugLogStore.add(TAG, message, error)
     }
 
     private fun jsonResponse(statusCode: Int, body: String): WebResourceResponse {
