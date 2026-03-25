@@ -61,7 +61,7 @@ class NativeDirectPlayerController(
                 }
         }
 
-        val manifestUri = Uri.parse(config.manifestUrl)
+        val manifestUri = normalizeStreamUri(Uri.parse(config.manifestUrl))
         val tokenEntries = manifestUri.queryParameterNames.associateWith { key ->
             manifestUri.getQueryParameter(key).orEmpty()
         }.filterValues { it.isNotBlank() }
@@ -114,7 +114,7 @@ class NativeDirectPlayerController(
 
         val mediaItemBuilder =
             MediaItem.Builder()
-                .setUri(config.manifestUrl)
+                .setUri(manifestUri)
 
         when (config.streamType.lowercase()) {
             "dash" -> mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_MPD)
@@ -221,13 +221,20 @@ class NativeDirectPlayerController(
             }
         }
 
-        return builder.build()
+        return normalizeStreamUri(builder.build())
     }
 
     private fun sameAuthority(left: Uri, right: Uri): Boolean {
         return left.scheme.equals(right.scheme, ignoreCase = true) &&
             left.host.equals(right.host, ignoreCase = true) &&
             left.port == right.port
+    }
+
+    private fun normalizeStreamUri(uri: Uri): Uri {
+        if (!uri.isHierarchical) return uri
+        return uri.buildUpon()
+            .path(uri.path?.replace(Regex("/+"), "/"))
+            .build()
     }
 
     data class DirectStreamConfig(

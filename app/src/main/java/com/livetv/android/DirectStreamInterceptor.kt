@@ -97,9 +97,10 @@ class DirectStreamInterceptor(
             ?: throw IllegalStateException("Channel not found in direct stream catalog")
 
         val manifestBaseUrl = pickManifest(entry)
-        val manifestUrl = appendToken(manifestBaseUrl, entry.optString("token"))
+        val manifestUrl = normalizeStreamUrl(appendToken(manifestBaseUrl, entry.optString("token")))
         val streamType = inferStreamType(manifestUrl)
             ?: throw IllegalStateException("No playable manifest found for this direct stream")
+        val useJioDirectHeaders = isJioBackedUrl(manifestUrl) || isJioBackedUrl(rawUrl)
 
         val payload = JSONObject()
         payload.put("channelId", channelId)
@@ -107,8 +108,8 @@ class DirectStreamInterceptor(
         payload.put("streamType", streamType)
         payload.put("manifestUrl", manifestUrl)
         payload.put("clearKeys", normalizeClearKeys(entry.optJSONObject("drm")) ?: JSONObject.NULL)
-        payload.put("referer", normalizeReferer(entry.optString("referer"), rawUrl))
-        payload.put("userAgent", normalizeUserAgent(entry.optString("userAgent")))
+        payload.put("referer", normalizeReferer(entry.optString("referer"), rawUrl, useJioDirectHeaders))
+        payload.put("userAgent", normalizeUserAgent(entry.optString("userAgent"), useJioDirectHeaders))
         payload.put("sourceUrl", rawUrl)
         return payload
     }
@@ -319,6 +320,19 @@ class DirectStreamInterceptor(
         }
     }
 
+    private fun normalizeStreamUrl(candidateUrl: String): String {
+        if (candidateUrl.isBlank()) return candidateUrl
+        return try {
+            val parsed = Uri.parse(candidateUrl)
+            parsed.buildUpon()
+                .path(parsed.path?.replace(Regex("/+"), "/"))
+                .build()
+                .toString()
+        } catch (_error: Exception) {
+            candidateUrl.replace(Regex("^(https?://[^/]+)/+"), "$1/")
+        }
+    }
+
     private fun inferStreamType(candidateUrl: String): String? {
         return when {
             MPD_REGEX.containsMatchIn(candidateUrl) -> "dash"
@@ -327,7 +341,8 @@ class DirectStreamInterceptor(
         }
     }
 
-    private fun normalizeReferer(candidate: String, fallback: String): String {
+    private fun normalizeReferer(candidate: String, fallback: String, useJioDirectHeaders: Boolean): String {
+        if (useJioDirectHeaders) return JIO_REFERER
         val value = candidate.trim()
         if (value.startsWith("http://", ignoreCase = true) || value.startsWith("https://", ignoreCase = true)) {
             return value
@@ -335,7 +350,8 @@ class DirectStreamInterceptor(
         return fallback
     }
 
-    private fun normalizeUserAgent(candidate: String): String {
+    private fun normalizeUserAgent(candidate: String, useJioDirectHeaders: Boolean): String {
+        if (useJioDirectHeaders) return JIO_USER_AGENT
         val value = candidate.trim()
         if (value.isBlank()) return DEFAULT_USER_AGENT
 
@@ -347,6 +363,10 @@ class DirectStreamInterceptor(
                 value.contains("Dalvik", ignoreCase = true)
 
         return if (looksLikeRealUserAgent) value else DEFAULT_USER_AGENT
+    }
+
+    private fun isJioBackedUrl(candidateUrl: String): Boolean {
+        return candidateUrl.contains(".jio.com", ignoreCase = true)
     }
 
     private fun parseChallengeHtml(html: String, fallbackUrl: String): ChallengeCookie? {
@@ -472,6 +492,8 @@ class DirectStreamInterceptor(
         private const val TAG = "DirectStream"
         private const val RESOLVE_PATH = "/api/resolve-direct-stream"
         private const val PROXY_PATH = "/api/direct-stream-proxy"
+        private const val JIO_REFERER = "https://www.jiotv.com/"
+        private const val JIO_USER_AGENT = "okhttp/4.9.0"
         private const val DEFAULT_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 13; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
