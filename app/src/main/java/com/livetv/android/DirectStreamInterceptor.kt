@@ -100,8 +100,8 @@ class DirectStreamInterceptor(
         payload.put("streamType", streamType)
         payload.put("manifestUrl", manifestUrl)
         payload.put("clearKeys", normalizeClearKeys(entry.optJSONObject("drm")) ?: JSONObject.NULL)
-        payload.put("referer", entry.optString("referer").ifBlank { rawUrl })
-        payload.put("userAgent", entry.optString("userAgent").ifBlank { DEFAULT_USER_AGENT })
+        payload.put("referer", normalizeReferer(entry.optString("referer"), rawUrl))
+        payload.put("userAgent", normalizeUserAgent(entry.optString("userAgent")))
         payload.put("sourceUrl", rawUrl)
         return payload
     }
@@ -312,6 +312,28 @@ class DirectStreamInterceptor(
             M3U8_REGEX.containsMatchIn(candidateUrl) -> "hls"
             else -> null
         }
+    }
+
+    private fun normalizeReferer(candidate: String, fallback: String): String {
+        val value = candidate.trim()
+        if (value.startsWith("http://", ignoreCase = true) || value.startsWith("https://", ignoreCase = true)) {
+            return value
+        }
+        return fallback
+    }
+
+    private fun normalizeUserAgent(candidate: String): String {
+        val value = candidate.trim()
+        if (value.isBlank()) return DEFAULT_USER_AGENT
+
+        val looksLikeRealUserAgent =
+            value.contains("Mozilla/", ignoreCase = true) ||
+                value.contains("AppleWebKit", ignoreCase = true) ||
+                value.contains("Chrome/", ignoreCase = true) ||
+                value.contains("okhttp", ignoreCase = true) ||
+                value.contains("Dalvik", ignoreCase = true)
+
+        return if (looksLikeRealUserAgent) value else DEFAULT_USER_AGENT
     }
 
     private fun parseChallengeHtml(html: String, fallbackUrl: String): ChallengeCookie? {
