@@ -9,7 +9,10 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.DataSourceException
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.drm.DefaultDrmSessionManager
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
@@ -58,11 +61,27 @@ class NativeDirectPlayerController(
                 }
         }
 
-        val dataSourceFactory =
+        val manifestUri = Uri.parse(config.manifestUrl)
+        val tokenEntries = manifestUri.queryParameterNames.associateWith { key ->
+            manifestUri.getQueryParameter(key).orEmpty()
+        }.filterValues { it.isNotBlank() }
+
+        val httpDataSourceFactory =
             DefaultHttpDataSource.Factory()
                 .setUserAgent(config.userAgent.ifBlank { DEFAULT_USER_AGENT })
                 .setAllowCrossProtocolRedirects(true)
                 .setDefaultRequestProperties(mediaHeaders)
+
+        val dataSourceFactory =
+            ResolvingDataSource.Factory(httpDataSourceFactory) { dataSpec ->
+                val rewrittenUri = rewriteMediaUri(dataSpec.uri, manifestUri, tokenEntries)
+                if (rewrittenUri != dataSpec.uri) {
+                    DebugLogStore.add(TAG, "Rewrote media request to $rewrittenUri")
+                    dataSpec.buildUpon().setUri(rewrittenUri).build()
+                } else {
+                    dataSpec
+                }
+            }
 
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
         buildDrmSessionManagerProvider(config)?.let(mediaSourceFactory::setDrmSessionManagerProvider)
@@ -81,7 +100,14 @@ class NativeDirectPlayerController(
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
-                    DebugLogStore.add(TAG, "Native player error code=${error.errorCodeName}", error)
+                    val detail = when (val cause = error.cause) {
+                        is DefaultHttpDataSource.InvalidResponseCodeException ->
+                            " status=${cause.responseCode} url=${cause.dataSpec?.uri}"
+                        is DataSourceException ->
+                            " dataSourceReason=${cause.reason}"
+                        else -> ""
+                    }
+                    DebugLogStore.add(TAG, "Native player error code=${error.errorCodeName}$detail", error)
                 }
             },
         )
@@ -168,6 +194,40 @@ class NativeDirectPlayerController(
             bytes,
             Base64.NO_WRAP or Base64.NO_PADDING or Base64.URL_SAFE,
         )
+    }
+
+    private fun rewriteMediaUri(
+        originalUri: Uri,
+        manifestUri: Uri,
+        tokenEntries: Map<String, String>,
+    ): Uri {
+        if (tokenEntries.isEmpty()) return originalUri
+        if (!originalUri.isHierarchical) return originalUri
+        if (!sameAuthority(originalUri, manifestUri)) return originalUri
+
+        var builder = originalUri.buildUpon().clearQuery()
+        originalUri.queryParameterNames.forEach { key ->
+            val values = originalUri.getQueryParameters(key)
+            if (values.isEmpty()) {
+                builder = builder.appendQueryParameter(key, null)
+            } else {
+                values.forEach { value -> builder = builder.appendQueryParameter(key, value) }
+            }
+        }
+
+        tokenEntries.forEach { (key, value) ->
+            if (!originalUri.queryParameterNames.contains(key)) {
+                builder = builder.appendQueryParameter(key, value)
+            }
+        }
+
+        return builder.build()
+    }
+
+    private fun sameAuthority(left: Uri, right: Uri): Boolean {
+        return left.scheme.equals(right.scheme, ignoreCase = true) &&
+            left.host.equals(right.host, ignoreCase = true) &&
+            left.port == right.port
     }
 
     data class DirectStreamConfig(
