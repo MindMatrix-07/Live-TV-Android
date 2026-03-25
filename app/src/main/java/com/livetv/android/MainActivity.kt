@@ -24,6 +24,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var androidLogsBridge: AndroidLogsBridge
+    private lateinit var nativePlayerController: NativeDirectPlayerController
+    private lateinit var androidNativePlayerBridge: AndroidNativePlayerBridge
     private val directStreamInterceptor = DirectStreamInterceptor(TARGET_HOST)
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -33,6 +35,8 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         androidLogsBridge = AndroidLogsBridge(this)
+        nativePlayerController = NativeDirectPlayerController(this, binding.nativePlayerView)
+        androidNativePlayerBridge = AndroidNativePlayerBridge(nativePlayerController)
         DebugLogStore.add("MainActivity", "App created")
 
         setupWebView()
@@ -67,7 +71,7 @@ class MainActivity : AppCompatActivity() {
                 setAcceptThirdPartyCookies(this@with, true)
             }
 
-            setBackgroundColor(Color.BLACK)
+            setBackgroundColor(Color.TRANSPARENT)
             keepScreenOn = true
             isFocusable = true
             isFocusableInTouchMode = true
@@ -79,6 +83,7 @@ class MainActivity : AppCompatActivity() {
             isHorizontalScrollBarEnabled = false
             setInitialScale(100)
             addJavascriptInterface(androidLogsBridge, "AndroidLogs")
+            addJavascriptInterface(androidNativePlayerBridge, "AndroidNativePlayer")
             webChromeClient = object : WebChromeClient() {
                 override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
                     val source = consoleMessage.sourceId()?.substringAfterLast('/') ?: "inline"
@@ -106,9 +111,13 @@ class MainActivity : AppCompatActivity() {
                     view?.evaluateJavascript(
                         """
                         (function () {
-                          document.documentElement.style.background = '#000';
-                          document.body.style.background = '#000';
-                          document.body.style.margin = '0';
+                          if (document.documentElement) {
+                            document.documentElement.style.background = '#000';
+                          }
+                          if (document.body) {
+                            document.body.style.background = '#000';
+                            document.body.style.margin = '0';
+                          }
                         })();
                         """.trimIndent(),
                         null,
@@ -177,6 +186,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         DebugLogStore.add("MainActivity", "App destroyed")
+        nativePlayerController.close()
         with(binding.webView) {
             stopLoading()
             clearHistory()
@@ -231,6 +241,12 @@ class MainActivity : AppCompatActivity() {
                   background: #000 !important;
                 }
 
+                html.android-native-direct-active,
+                body.android-native-direct-active,
+                body.android-native-direct-active #root {
+                  background: transparent !important;
+                }
+
                 body.android-tv-shell {
                   overscroll-behavior: none;
                 }
@@ -266,6 +282,31 @@ class MainActivity : AppCompatActivity() {
                 body.android-tv-shell .debug-log-button {
                   font-size: clamp(0.5rem, calc(0.52rem * var(--android-tv-scale)), 0.68rem) !important;
                   padding: calc(5px * var(--android-tv-scale)) calc(10px * var(--android-tv-scale)) !important;
+                }
+
+                body.android-tv-shell .native-direct-stage-pill {
+                  font-size: clamp(0.56rem, calc(0.62rem * var(--android-tv-scale)), 0.74rem) !important;
+                  padding: calc(7px * var(--android-tv-scale)) calc(12px * var(--android-tv-scale)) !important;
+                }
+
+                body.android-tv-shell .channel-loading-card {
+                  min-width: min(76vw, calc(380px * var(--android-tv-scale))) !important;
+                  padding: calc(18px * var(--android-tv-scale))
+                           calc(20px * var(--android-tv-scale))
+                           calc(16px * var(--android-tv-scale)) !important;
+                  border-radius: calc(20px * var(--android-tv-scale)) !important;
+                }
+
+                body.android-tv-shell .channel-loading-label {
+                  font-size: clamp(0.82rem, calc(0.9rem * var(--android-tv-scale)), 1rem) !important;
+                }
+
+                body.android-tv-shell .channel-loading-bar {
+                  height: calc(10px * var(--android-tv-scale)) !important;
+                }
+
+                body.android-tv-shell .channel-loading-percent {
+                  font-size: clamp(0.66rem, calc(0.72rem * var(--android-tv-scale)), 0.82rem) !important;
                 }
 
                 body.android-tv-shell .epg-list {
