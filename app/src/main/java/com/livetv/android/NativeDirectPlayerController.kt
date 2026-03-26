@@ -41,7 +41,10 @@ class NativeDirectPlayerController(
             return false
         }
 
-        if (activeManifestUrl == config.manifestUrl && player != null) {
+        val manifestUri = normalizeManifestUri(Uri.parse(config.manifestUrl))
+        val normalizedManifestUrl = manifestUri.toString()
+
+        if (activeManifestUrl == normalizedManifestUrl && player != null) {
             playerView.visibility = View.VISIBLE
             return true
         }
@@ -63,10 +66,7 @@ class NativeDirectPlayerController(
                 }
         }
 
-        val manifestUri = Uri.parse(config.manifestUrl)
-        val tokenEntries = manifestUri.queryParameterNames.associateWith { key ->
-            manifestUri.getQueryParameter(key).orEmpty()
-        }.filterValues { it.isNotBlank() }
+        val tokenEntries = buildTokenEntries(manifestUri)
 
         val httpDataSourceFactory =
             DefaultHttpDataSource.Factory()
@@ -76,7 +76,7 @@ class NativeDirectPlayerController(
 
         val dataSourceFactory =
             ResolvingDataSource.Factory(httpDataSourceFactory) { dataSpec ->
-                val rewrittenUri = rewriteMediaUri(dataSpec.uri, manifestUri, tokenEntries)
+                val rewrittenUri = rewriteMediaUri(dataSpec.uri, manifestUri, tokenEntries, config)
                 if (rewrittenUri != dataSpec.uri) {
                     DebugLogStore.add(TAG, "Rewrote media request to $rewrittenUri")
                     dataSpec.buildUpon().setUri(rewrittenUri).build()
@@ -126,7 +126,7 @@ class NativeDirectPlayerController(
 
         val mediaItemBuilder =
             MediaItem.Builder()
-                .setUri(config.manifestUrl)
+                .setUri(normalizedManifestUrl)
 
         when (config.streamType.lowercase()) {
             "dash" -> mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_MPD)
@@ -144,7 +144,7 @@ class NativeDirectPlayerController(
         exoPlayer.prepare()
 
         player = exoPlayer
-        activeManifestUrl = config.manifestUrl
+        activeManifestUrl = normalizedManifestUrl
         playerView.player = exoPlayer
         playerView.useController = false
         playerView.controllerAutoShow = false
@@ -208,7 +208,56 @@ class NativeDirectPlayerController(
         )
     }
 
+    private fun normalizeManifestUri(manifestUri: Uri): Uri {
+        if (!manifestUri.isHierarchical) return manifestUri
+
+        val hdnea = manifestUri.getQueryParameter("hdnea")
+            .orEmpty()
+            .ifBlank { manifestUri.getQueryParameter("__hdnea__").orEmpty() }
+
+        if (hdnea.isBlank() || !manifestUri.getQueryParameter("hdnea").isNullOrBlank()) {
+            return manifestUri
+        }
+
+        return manifestUri.buildUpon()
+            .appendQueryParameter("hdnea", hdnea)
+            .build()
+    }
+
+    private fun buildTokenEntries(manifestUri: Uri): Map<String, String> {
+        val tokens =
+            linkedMapOf<String, String>().apply {
+                manifestUri.queryParameterNames.forEach { key ->
+                    manifestUri.getQueryParameter(key)
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { value -> put(key, value) }
+                }
+            }
+
+        val hdnea = tokens["hdnea"].orEmpty().ifBlank { tokens["__hdnea__"].orEmpty() }
+        if (hdnea.isNotBlank()) {
+            tokens.putIfAbsent("hdnea", hdnea)
+        }
+
+        return tokens
+    }
+
     private fun rewriteMediaUri(
+        originalUri: Uri,
+        manifestUri: Uri,
+        tokenEntries: Map<String, String>,
+        config: DirectStreamConfig,
+    ): Uri {
+        val tokenizedUri = appendManifestTokens(originalUri, manifestUri, tokenEntries)
+
+        if (config.authMode.equals("jio", ignoreCase = true) && isJioFallbackKeyUri(tokenizedUri)) {
+            return buildJioKeyProxyUri(tokenizedUri, manifestUri.toString(), config)
+        }
+
+        return tokenizedUri
+    }
+
+    private fun appendManifestTokens(
         originalUri: Uri,
         manifestUri: Uri,
         tokenEntries: Map<String, String>,
@@ -234,6 +283,48 @@ class NativeDirectPlayerController(
         }
 
         return builder.build()
+    }
+
+    private fun isJioFallbackKeyUri(uri: Uri): Boolean {
+        val host = uri.host.orEmpty()
+        val path = uri.path.orEmpty()
+        return host.equals("tv.media.jio.com", ignoreCase = true) &&
+            path.contains("/fallback/", ignoreCase = true) &&
+            path.endsWith(".pkey", ignoreCase = true)
+    }
+
+    private fun sanitizeJioKeyUri(uri: Uri): Uri {
+        if (!uri.isHierarchical) return uri
+
+        var builder = uri.buildUpon().clearQuery()
+        uri.queryParameterNames.forEach { key ->
+            if (key.equals("minrate", ignoreCase = true) || key.equals("maxrate", ignoreCase = true)) {
+                return@forEach
+            }
+            val values = uri.getQueryParameters(key)
+            if (values.isEmpty()) {
+                builder = builder.appendQueryParameter(key, null)
+            } else {
+                values.forEach { value -> builder = builder.appendQueryParameter(key, value) }
+            }
+        }
+
+        return builder.build()
+    }
+
+    private fun buildJioKeyProxyUri(
+        keyUri: Uri,
+        referer: String,
+        config: DirectStreamConfig,
+    ): Uri {
+        val sanitizedKeyUri = sanitizeJioKeyUri(keyUri)
+        return Uri.parse("$APP_BASE_URL$JIO_KEY_PATH")
+            .buildUpon()
+            .appendQueryParameter("url", sanitizedKeyUri.toString())
+            .appendQueryParameter("referer", referer)
+            .appendQueryParameter("ua", config.userAgent.ifBlank { DEFAULT_USER_AGENT })
+            .appendQueryParameter("channelId", config.channelId)
+            .build()
     }
 
     private fun shouldPropagateManifestTokens(originalUri: Uri, manifestUri: Uri): Boolean {
@@ -262,6 +353,7 @@ class NativeDirectPlayerController(
         val channelName: String,
         val manifestUrl: String,
         val streamType: String,
+        val authMode: String,
         val referer: String,
         val userAgent: String,
         val clearKeys: Map<String, String>,
@@ -285,6 +377,7 @@ class NativeDirectPlayerController(
                     channelName = root.optString("channelName"),
                     manifestUrl = root.optString("manifestUrl"),
                     streamType = root.optString("streamType"),
+                    authMode = root.optString("authMode"),
                     referer = root.optString("referer"),
                     userAgent = root.optString("userAgent"),
                     clearKeys = clearKeys,
@@ -295,6 +388,8 @@ class NativeDirectPlayerController(
 
     companion object {
         private const val TAG = "NativeDirectPlayer"
+        private const val APP_BASE_URL = "https://jiolivetv.vercel.app"
+        private const val JIO_KEY_PATH = "/api/jio-key-proxy"
         private const val DEFAULT_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 13; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
     }
