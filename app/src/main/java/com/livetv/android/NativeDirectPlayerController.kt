@@ -214,7 +214,7 @@ class NativeDirectPlayerController(
     ): Uri {
         if (tokenEntries.isEmpty()) return originalUri
         if (!originalUri.isHierarchical) return originalUri
-        if (!sameAuthority(originalUri, manifestUri)) return originalUri
+        if (!shouldPropagateManifestTokens(originalUri, manifestUri)) return originalUri
 
         var builder = originalUri.buildUpon().clearQuery()
         originalUri.queryParameterNames.forEach { key ->
@@ -233,6 +233,21 @@ class NativeDirectPlayerController(
         }
 
         return builder.build()
+    }
+
+    private fun shouldPropagateManifestTokens(originalUri: Uri, manifestUri: Uri): Boolean {
+        if (sameAuthority(originalUri, manifestUri)) return true
+
+        val host = originalUri.host.orEmpty()
+        val path = originalUri.path.orEmpty()
+        val manifestHost = manifestUri.host.orEmpty()
+
+        if (!host.equals("tv.media.jio.com", ignoreCase = true)) return false
+        if (!manifestHost.contains("jio.com", ignoreCase = true)) return false
+        if (!path.contains("/fallback/", ignoreCase = true)) return false
+
+        return path.contains("/hls/", ignoreCase = true) ||
+            path.endsWith(".pkey", ignoreCase = true)
     }
 
     private fun sameAuthority(left: Uri, right: Uri): Boolean {
