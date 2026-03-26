@@ -28,28 +28,9 @@ class DirectStreamInterceptor(
 
         return when (url.encodedPath) {
             RESOLVE_PATH -> handleResolve(url)
-            PROXY_PATH -> {
-                if (shouldBypassProxy(url)) {
-                    debug("Proxy bypassed to network ${request.method ?: "GET"} ${url}")
-                    null
-                } else {
-                    handleProxy(request, url)
-                }
-            }
+            PROXY_PATH -> handleProxy(request, url)
             else -> null
         }
-    }
-
-    private fun shouldBypassProxy(url: Uri): Boolean {
-        val rawTargetUrl = url.getQueryParameter("url").orEmpty()
-        if (rawTargetUrl.isBlank()) return false
-
-        val targetUri = runCatching { Uri.parse(rawTargetUrl) }.getOrNull() ?: return false
-        val host = targetUri.host?.lowercase().orEmpty()
-
-        return host == "jiotvbpkmob.cdn.jio.com" ||
-            host == "jiotvmblive.cdn.jio.com" ||
-            host == "tv.media.jio.com"
     }
 
     private fun handleResolve(url: Uri): WebResourceResponse {
@@ -205,24 +186,112 @@ class DirectStreamInterceptor(
                 ?.let { requestHeaders["Origin"] = it }
         }
 
-        request.requestHeaders["Range"]?.let { requestHeaders["Range"] = it }
+        if (shouldForwardRange(rawTargetUrl)) {
+            request.requestHeaders["Range"]?.let { requestHeaders["Range"] = it }
+        }
 
         val upstream = fetchBytes(rawTargetUrl, request.method ?: "GET", requestHeaders)
         if (shouldLogProxyResult(rawTargetUrl, upstream.statusCode)) {
             debug("Proxy upstream ${upstream.statusCode} ${request.method ?: "GET"} $rawTargetUrl")
         }
-        val bodyStream = ByteArrayInputStream(upstream.body)
-        val mimeType = upstream.headers["Content-Type"]?.substringBefore(';') ?: "application/octet-stream"
+        val rewrittenPlaylist = if (isPlaylistResponse(rawTargetUrl, upstream.headers["Content-Type"])) {
+            rewritePlaylist(
+                upstream.body.toString(StandardCharsets.UTF_8),
+                rawTargetUrl,
+                requestHeaders["User-Agent"].orEmpty(),
+                proxyUrl.getQueryParameter("channelId").orEmpty(),
+            ).toByteArray(StandardCharsets.UTF_8)
+        } else {
+            upstream.body
+        }
+        val bodyStream = ByteArrayInputStream(rewrittenPlaylist)
+        val mimeType = if (isPlaylistResponse(rawTargetUrl, upstream.headers["Content-Type"])) {
+            "application/vnd.apple.mpegurl"
+        } else {
+            upstream.headers["Content-Type"]?.substringBefore(';') ?: "application/octet-stream"
+        }
         val encoding = upstream.headers["Content-Type"]?.substringAfter("charset=", "utf-8") ?: "utf-8"
+        val responseHeaders = filterResponseHeaders(upstream.headers).toMutableMap()
+        if (isPlaylistResponse(rawTargetUrl, upstream.headers["Content-Type"])) {
+            responseHeaders.remove("Content-Length")
+            responseHeaders.remove("Content-Range")
+            responseHeaders.remove("Accept-Ranges")
+            responseHeaders["Content-Type"] = "application/vnd.apple.mpegurl"
+        }
 
         return WebResourceResponse(
             mimeType,
             encoding,
-            upstream.statusCode,
-            statusPhrase(upstream.statusCode, upstream.reasonPhrase),
-            filterResponseHeaders(upstream.headers),
+            if (isPlaylistResponse(rawTargetUrl, upstream.headers["Content-Type"])) 200 else upstream.statusCode,
+            if (isPlaylistResponse(rawTargetUrl, upstream.headers["Content-Type"])) "OK" else statusPhrase(upstream.statusCode, upstream.reasonPhrase),
+            responseHeaders,
             bodyStream,
         )
+    }
+
+    private fun shouldForwardRange(rawTargetUrl: String): Boolean {
+        val lower = rawTargetUrl.lowercase()
+        return !lower.contains(".m3u8")
+    }
+
+    private fun isPlaylistResponse(rawTargetUrl: String, contentType: String?): Boolean {
+        val lowerUrl = rawTargetUrl.lowercase()
+        val lowerContentType = contentType.orEmpty().lowercase()
+        return lowerUrl.contains(".m3u8") ||
+            lowerContentType.contains("application/vnd.apple.mpegurl") ||
+            lowerContentType.contains("application/x-mpegurl")
+    }
+
+    private fun isJioKeyUrl(rawTargetUrl: String): Boolean {
+        val lower = rawTargetUrl.lowercase()
+        return lower.contains("tv.media.jio.com") &&
+            lower.contains("/fallback/") &&
+            lower.contains(".pkey")
+    }
+
+    private fun rewritePlaylist(
+        body: String,
+        playlistUrl: String,
+        userAgent: String,
+        channelId: String,
+    ): String {
+        val baseUrl = URL(playlistUrl)
+        val referer = playlistUrl
+
+        fun rewriteTarget(rawValue: String): String {
+            if (rawValue.isBlank()) return rawValue
+            val resolved = runCatching { URL(baseUrl, rawValue).toString() }.getOrDefault(rawValue)
+            val endpoint = if (isJioKeyUrl(resolved)) JIO_KEY_PATH else PROXY_PATH
+            return buildString {
+                append("https://")
+                append(appHost)
+                append(endpoint)
+                append("?url=")
+                append(Uri.encode(resolved))
+                append("&referer=")
+                append(Uri.encode(referer))
+                append("&ua=")
+                append(Uri.encode(userAgent.ifBlank { DEFAULT_USER_AGENT }))
+                if (channelId.isNotBlank()) {
+                    append("&channelId=")
+                    append(Uri.encode(channelId))
+                }
+            }
+        }
+
+        return body
+            .split("\n")
+            .joinToString("\n") { line ->
+                val trimmed = line.trim()
+                when {
+                    trimmed.isBlank() -> line
+                    trimmed.startsWith("#") -> line.replace(URI_ATTRIBUTE_REGEX) { matchResult ->
+                        val rawValue = matchResult.groupValues[1]
+                        "URI=\"${rewriteTarget(rawValue)}\""
+                    }
+                    else -> rewriteTarget(trimmed)
+                }
+            }
     }
 
     private fun handleDataUrl(rawTargetUrl: String): WebResourceResponse {
@@ -515,6 +584,7 @@ class DirectStreamInterceptor(
         private const val TAG = "DirectStream"
         private const val RESOLVE_PATH = "/api/resolve-direct-stream"
         private const val PROXY_PATH = "/api/direct-stream-proxy"
+        private const val JIO_KEY_PATH = "/api/jio-key-proxy"
         private const val DEFAULT_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 13; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
@@ -522,5 +592,6 @@ class DirectStreamInterceptor(
         private val M3U8_REGEX = Regex("""\.m3u8(?:[?#]|$)""", RegexOption.IGNORE_CASE)
         private val CHALLENGE_HEX_REGEX = Regex("""toNumbers\("([0-9a-f]+)"\)""", RegexOption.IGNORE_CASE)
         private val LOCATION_REGEX = Regex("location\\.href=\"([^\"]+)\"")
+        private val URI_ATTRIBUTE_REGEX = Regex("URI=\"([^\"]+)\"")
     }
 }
