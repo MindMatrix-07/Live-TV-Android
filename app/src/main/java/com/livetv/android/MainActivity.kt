@@ -332,6 +332,25 @@ class MainActivity : AppCompatActivity() {
                   padding: calc(4px * var(--android-tv-scale)) calc(10px * var(--android-tv-scale)) !important;
                 }
 
+                body.android-tv-shell .channel-audio-switcher {
+                  gap: calc(10px * var(--android-tv-scale)) !important;
+                  padding: calc(14px * var(--android-tv-scale)) calc(16px * var(--android-tv-scale)) !important;
+                  border-radius: calc(18px * var(--android-tv-scale)) !important;
+                }
+
+                body.android-tv-shell .channel-audio-switcher-current {
+                  font-size: clamp(0.72rem, calc(0.8rem * var(--android-tv-scale)), 0.94rem) !important;
+                }
+
+                body.android-tv-shell .channel-audio-switcher-option {
+                  font-size: clamp(0.68rem, calc(0.76rem * var(--android-tv-scale)), 0.9rem) !important;
+                  padding: calc(8px * var(--android-tv-scale)) calc(13px * var(--android-tv-scale)) !important;
+                }
+
+                body.android-tv-shell .channel-audio-switcher-hint {
+                  font-size: clamp(0.62rem, calc(0.68rem * var(--android-tv-scale)), 0.78rem) !important;
+                }
+
                 body.android-tv-shell .channel-tune-hint {
                   padding: calc(18px * var(--android-tv-scale)) calc(30px * var(--android-tv-scale)) !important;
                   border-radius: calc(20px * var(--android-tv-scale)) !important;

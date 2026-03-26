@@ -9,6 +9,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.datasource.DataSourceException
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -22,6 +23,7 @@ import androidx.media3.exoplayer.drm.LocalMediaDrmCallback
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.PlayerView
+import org.json.JSONArray
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
 
@@ -30,6 +32,7 @@ class NativeDirectPlayerController(
     private val playerView: PlayerView,
 ) {
     private var player: ExoPlayer? = null
+    private var trackSelector: DefaultTrackSelector? = null
     private var activeManifestUrl: String? = null
 
     fun play(configJson: String): Boolean {
@@ -144,6 +147,7 @@ class NativeDirectPlayerController(
         exoPlayer.prepare()
 
         player = exoPlayer
+        this.trackSelector = trackSelector
         activeManifestUrl = normalizedManifestUrl
         playerView.player = exoPlayer
         playerView.useController = false
@@ -152,6 +156,59 @@ class NativeDirectPlayerController(
         playerView.isFocusable = false
         playerView.visibility = View.VISIBLE
 
+        return true
+    }
+
+    fun getAudioTracksJson(): String {
+        val currentPlayer = player ?: return "[]"
+        val result = JSONArray()
+
+        currentPlayer.currentTracks.groups.forEachIndexed { groupIndex, group ->
+            if (group.type != C.TRACK_TYPE_AUDIO) return@forEachIndexed
+
+            for (trackIndex in 0 until group.length) {
+                val format = group.getTrackFormat(trackIndex)
+                val item =
+                    JSONObject().apply {
+                        put("id", "$groupIndex:$trackIndex")
+                        put("groupIndex", groupIndex)
+                        put("trackIndex", trackIndex)
+                        put("label", format.label.orEmpty())
+                        put("language", format.language.orEmpty())
+                        put("selected", group.isTrackSelected(trackIndex))
+                    }
+                result.put(item)
+            }
+        }
+
+        return result.toString()
+    }
+
+    fun selectAudioTrack(trackId: String): Boolean {
+        val selector = trackSelector ?: return false
+        val currentPlayer = player ?: return false
+
+        val parts = trackId.split(':')
+        if (parts.size != 2) return false
+
+        val groupIndex = parts[0].toIntOrNull() ?: return false
+        val trackIndex = parts[1].toIntOrNull() ?: return false
+        val audioGroups = currentPlayer.currentTracks.groups
+
+        if (groupIndex !in audioGroups.indices) return false
+
+        val group = audioGroups[groupIndex]
+        if (group.type != C.TRACK_TYPE_AUDIO) return false
+        if (trackIndex !in 0 until group.length) return false
+
+        val override = TrackSelectionOverride(group.mediaTrackGroup, listOf(trackIndex))
+        selector.setParameters(
+            selector.buildUponParameters()
+                .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+                .addOverride(override)
+                .build(),
+        )
+        DebugLogStore.add(TAG, "Selected audio track $trackId")
         return true
     }
 
@@ -165,6 +222,7 @@ class NativeDirectPlayerController(
         playerView.player = null
         player?.release()
         player = null
+        trackSelector = null
         activeManifestUrl = null
     }
 

@@ -41,4 +41,38 @@ class AndroidNativePlayerBridge(
         }
         return true
     }
+
+    @JavascriptInterface
+    fun getAudioTracks(): String {
+        val result = arrayOf("[]")
+        val latch = CountDownLatch(1)
+
+        mainHandler.post {
+            result[0] = runCatching { playerController.getAudioTracksJson() }.getOrElse { error ->
+                DebugLogStore.add("AndroidNativePlayerBridge", "Read audio tracks failed", error)
+                "[]"
+            }
+            latch.countDown()
+        }
+
+        latch.await(1200, TimeUnit.MILLISECONDS)
+        return result[0]
+    }
+
+    @JavascriptInterface
+    fun selectAudioTrack(trackId: String): Boolean {
+        val result = AtomicBoolean(false)
+        val latch = CountDownLatch(1)
+
+        mainHandler.post {
+            result.set(runCatching { playerController.selectAudioTrack(trackId) }.getOrElse { error ->
+                DebugLogStore.add("AndroidNativePlayerBridge", "Select audio track failed", error)
+                false
+            })
+            latch.countDown()
+        }
+
+        latch.await(1200, TimeUnit.MILLISECONDS)
+        return result.get()
+    }
 }
