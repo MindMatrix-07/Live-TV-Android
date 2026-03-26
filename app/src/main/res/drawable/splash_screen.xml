@@ -1,5 +1,5 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/brand_red" />
+    <item android:drawable="@android:color/black" />
 
     <item
         android:width="280dp"
