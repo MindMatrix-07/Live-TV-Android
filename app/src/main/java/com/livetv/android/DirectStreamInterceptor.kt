@@ -28,9 +28,28 @@ class DirectStreamInterceptor(
 
         return when (url.encodedPath) {
             RESOLVE_PATH -> handleResolve(url)
-            PROXY_PATH -> handleProxy(request, url)
+            PROXY_PATH -> {
+                if (shouldBypassProxy(url)) {
+                    debug("Proxy bypassed to network ${request.method ?: "GET"} ${url}")
+                    null
+                } else {
+                    handleProxy(request, url)
+                }
+            }
             else -> null
         }
+    }
+
+    private fun shouldBypassProxy(url: Uri): Boolean {
+        val rawTargetUrl = url.getQueryParameter("url").orEmpty()
+        if (rawTargetUrl.isBlank()) return false
+
+        val targetUri = runCatching { Uri.parse(rawTargetUrl) }.getOrNull() ?: return false
+        val host = targetUri.host?.lowercase().orEmpty()
+
+        return host == "jiotvbpkmob.cdn.jio.com" ||
+            host == "jiotvmblive.cdn.jio.com" ||
+            host == "tv.media.jio.com"
     }
 
     private fun handleResolve(url: Uri): WebResourceResponse {
