@@ -290,23 +290,35 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 body.android-tv-shell .channel-loading-card {
-                  min-width: min(76vw, calc(380px * var(--android-tv-scale))) !important;
-                  padding: calc(18px * var(--android-tv-scale))
-                           calc(20px * var(--android-tv-scale))
-                           calc(16px * var(--android-tv-scale)) !important;
-                  border-radius: calc(20px * var(--android-tv-scale)) !important;
+                  width: min(76vw, calc(380px * var(--android-tv-scale))) !important;
+                  padding: calc(9px * var(--android-tv-scale))
+                           calc(11px * var(--android-tv-scale))
+                           calc(10px * var(--android-tv-scale)) !important;
+                  border-radius: calc(14px * var(--android-tv-scale)) !important;
+                }
+
+                body.android-tv-shell .channel-loading-overlay {
+                  top: max(env(safe-area-inset-top, 0px), calc(10px * var(--android-tv-scale))) !important;
+                  left: 50% !important;
+                  transform: translateX(-50%) !important;
+                  inset: auto !important;
+                  width: min(82vw, calc(420px * var(--android-tv-scale))) !important;
+                }
+
+                body.android-tv-shell .channel-loading-meta {
+                  gap: calc(8px * var(--android-tv-scale)) !important;
                 }
 
                 body.android-tv-shell .channel-loading-label {
-                  font-size: clamp(0.82rem, calc(0.9rem * var(--android-tv-scale)), 1rem) !important;
+                  font-size: clamp(0.7rem, calc(0.76rem * var(--android-tv-scale)), 0.88rem) !important;
                 }
 
                 body.android-tv-shell .channel-loading-bar {
-                  height: calc(10px * var(--android-tv-scale)) !important;
+                  height: calc(6px * var(--android-tv-scale)) !important;
                 }
 
                 body.android-tv-shell .channel-loading-percent {
-                  font-size: clamp(0.66rem, calc(0.72rem * var(--android-tv-scale)), 0.82rem) !important;
+                  font-size: clamp(0.54rem, calc(0.6rem * var(--android-tv-scale)), 0.7rem) !important;
                 }
 
                 body.android-tv-shell .epg-list {
