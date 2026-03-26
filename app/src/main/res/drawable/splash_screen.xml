@@ -1,0 +1,9 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/brand_red" />
+
+    <item
+        android:width="280dp"
+        android:height="280dp"
+        android:gravity="center"
+        android:drawable="@drawable/app_brand" />
+</layer-list>
