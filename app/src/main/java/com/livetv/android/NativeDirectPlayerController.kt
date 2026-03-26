@@ -12,6 +12,7 @@ import androidx.media3.common.Player
 import androidx.media3.datasource.DataSourceException
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.drm.DefaultDrmSessionManager
@@ -112,8 +113,8 @@ class NativeDirectPlayerController(
 
                 override fun onPlayerError(error: PlaybackException) {
                     val detail = when (val cause = error.cause) {
-                        is DefaultHttpDataSource.InvalidResponseCodeException ->
-                            " status=${cause.responseCode} url=${cause.dataSpec?.uri}"
+                        is HttpDataSource.InvalidResponseCodeException ->
+                            " status=${cause.responseCode} url=${cause.dataSpec.uri}"
                         is DataSourceException ->
                             " dataSourceReason=${cause.reason}"
                         else -> ""

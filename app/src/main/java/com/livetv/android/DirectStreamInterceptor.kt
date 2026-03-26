@@ -126,7 +126,7 @@ class DirectStreamInterceptor(
             throw IllegalStateException("Catalog fetch failed: ${initial.statusCode}")
         }
 
-        val initialText = initial.body.toString(StandardCharsets.UTF_8.name())
+        val initialText = String(initial.body, StandardCharsets.UTF_8)
         return try {
             JSONArray(initialText)
         } catch (_jsonError: Exception) {
@@ -143,7 +143,7 @@ class DirectStreamInterceptor(
                 throw IllegalStateException("Catalog challenge retry failed: ${retry.statusCode}")
             }
 
-            JSONArray(retry.body.toString(StandardCharsets.UTF_8.name()))
+            JSONArray(String(retry.body, StandardCharsets.UTF_8))
         }
     }
 

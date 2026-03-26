@@ -192,7 +192,6 @@ class MainActivity : AppCompatActivity() {
             clearHistory()
             clearCache(false)
             webChromeClient = null
-            webViewClient = null
             loadUrl("about:blank")
             destroy()
         }
