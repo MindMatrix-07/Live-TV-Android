@@ -263,25 +263,25 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 body.android-tv-shell .glass-panel {
-                  max-width: min(50vw, calc(500px * var(--android-tv-scale))) !important;
-                  border-radius: calc(20px * var(--android-tv-scale)) !important;
-                  padding: calc(14px * var(--android-tv-scale))
-                           calc(16px * var(--android-tv-scale))
+                  max-width: min(44vw, calc(440px * var(--android-tv-scale))) !important;
+                  border-radius: calc(18px * var(--android-tv-scale)) !important;
+                  padding: calc(12px * var(--android-tv-scale))
                            calc(14px * var(--android-tv-scale))
-                           calc(16px * var(--android-tv-scale)) !important;
+                           calc(10px * var(--android-tv-scale))
+                           calc(14px * var(--android-tv-scale)) !important;
                 }
 
                 body.android-tv-shell .channel-title {
-                  font-size: clamp(1.5rem, calc(2rem * var(--android-tv-scale)), 2.3rem) !important;
+                  font-size: clamp(1.3rem, calc(1.72rem * var(--android-tv-scale)), 2rem) !important;
                 }
 
                 body.android-tv-shell .channel-time {
-                  font-size: clamp(0.78rem, calc(0.92rem * var(--android-tv-scale)), 1rem) !important;
+                  font-size: clamp(0.68rem, calc(0.8rem * var(--android-tv-scale)), 0.88rem) !important;
                 }
 
                 body.android-tv-shell .debug-log-button {
-                  font-size: clamp(0.5rem, calc(0.52rem * var(--android-tv-scale)), 0.68rem) !important;
-                  padding: calc(5px * var(--android-tv-scale)) calc(10px * var(--android-tv-scale)) !important;
+                  font-size: clamp(0.44rem, calc(0.48rem * var(--android-tv-scale)), 0.58rem) !important;
+                  padding: calc(4px * var(--android-tv-scale)) calc(8px * var(--android-tv-scale)) !important;
                 }
 
                 body.android-tv-shell .native-direct-stage-pill {
@@ -310,45 +310,68 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 body.android-tv-shell .epg-list {
-                  width: min(46vw, calc(420px * var(--android-tv-scale))) !important;
-                  gap: calc(5px * var(--android-tv-scale)) !important;
+                  width: min(40vw, calc(360px * var(--android-tv-scale))) !important;
+                  gap: 0 !important;
                 }
 
                 body.android-tv-shell .epg-item {
-                  padding: calc(10px * var(--android-tv-scale)) calc(12px * var(--android-tv-scale)) !important;
-                  border-radius: calc(12px * var(--android-tv-scale)) !important;
+                  padding: calc(8px * var(--android-tv-scale)) calc(10px * var(--android-tv-scale)) !important;
+                  border-radius: calc(10px * var(--android-tv-scale)) !important;
                 }
 
                 body.android-tv-shell .epg-title {
-                  font-size: clamp(0.78rem, calc(0.86rem * var(--android-tv-scale)), 0.96rem) !important;
+                  font-size: clamp(0.7rem, calc(0.76rem * var(--android-tv-scale)), 0.86rem) !important;
                 }
 
                 body.android-tv-shell .epg-time {
-                  font-size: clamp(0.62rem, calc(0.68rem * var(--android-tv-scale)), 0.76rem) !important;
+                  font-size: clamp(0.56rem, calc(0.6rem * var(--android-tv-scale)), 0.68rem) !important;
                 }
 
                 body.android-tv-shell .epg-badge {
-                  font-size: clamp(0.5rem, calc(0.56rem * var(--android-tv-scale)), 0.64rem) !important;
-                  padding: calc(3px * var(--android-tv-scale)) calc(8px * var(--android-tv-scale)) !important;
+                  font-size: clamp(0.44rem, calc(0.48rem * var(--android-tv-scale)), 0.56rem) !important;
+                  padding: calc(2px * var(--android-tv-scale)) calc(6px * var(--android-tv-scale)) !important;
                 }
 
                 body.android-tv-shell .channel-audio-switcher {
-                  gap: calc(8px * var(--android-tv-scale)) !important;
-                  padding: calc(10px * var(--android-tv-scale)) calc(12px * var(--android-tv-scale)) !important;
-                  border-radius: calc(14px * var(--android-tv-scale)) !important;
+                  gap: calc(6px * var(--android-tv-scale)) !important;
+                  padding: calc(8px * var(--android-tv-scale)) calc(10px * var(--android-tv-scale)) !important;
+                  border-radius: calc(12px * var(--android-tv-scale)) !important;
                 }
 
                 body.android-tv-shell .channel-audio-switcher-current {
-                  font-size: clamp(0.64rem, calc(0.72rem * var(--android-tv-scale)), 0.82rem) !important;
+                  font-size: clamp(0.56rem, calc(0.62rem * var(--android-tv-scale)), 0.72rem) !important;
                 }
 
                 body.android-tv-shell .channel-audio-switcher-option {
-                  font-size: clamp(0.6rem, calc(0.68rem * var(--android-tv-scale)), 0.76rem) !important;
-                  padding: calc(6px * var(--android-tv-scale)) calc(10px * var(--android-tv-scale)) !important;
+                  font-size: clamp(0.54rem, calc(0.58rem * var(--android-tv-scale)), 0.68rem) !important;
+                  padding: calc(5px * var(--android-tv-scale)) calc(8px * var(--android-tv-scale)) !important;
                 }
 
-                body.android-tv-shell .channel-audio-switcher-hint {
-                  font-size: clamp(0.56rem, calc(0.62rem * var(--android-tv-scale)), 0.7rem) !important;
+                body.android-tv-shell .channel-quick-controls {
+                  gap: calc(5px * var(--android-tv-scale)) !important;
+                  margin-top: calc(8px * var(--android-tv-scale)) !important;
+                  padding: calc(5px * var(--android-tv-scale)) calc(6px * var(--android-tv-scale)) !important;
+                  border-radius: calc(10px * var(--android-tv-scale)) !important;
+                }
+
+                body.android-tv-shell .channel-nav-button {
+                  padding: calc(6px * var(--android-tv-scale)) calc(7px * var(--android-tv-scale)) !important;
+                  gap: calc(5px * var(--android-tv-scale)) !important;
+                  border-radius: calc(9px * var(--android-tv-scale)) !important;
+                }
+
+                body.android-tv-shell .channel-nav-label {
+                  font-size: clamp(0.42rem, calc(0.46rem * var(--android-tv-scale)), 0.52rem) !important;
+                }
+
+                body.android-tv-shell .channel-nav-name {
+                  font-size: clamp(0.56rem, calc(0.62rem * var(--android-tv-scale)), 0.72rem) !important;
+                }
+
+                body.android-tv-shell .channel-icon-button {
+                  width: calc(32px * var(--android-tv-scale)) !important;
+                  height: calc(32px * var(--android-tv-scale)) !important;
+                  border-radius: calc(10px * var(--android-tv-scale)) !important;
                 }
 
                 body.android-tv-shell .channel-tune-hint {
