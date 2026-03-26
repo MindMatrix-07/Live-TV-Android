@@ -200,7 +200,7 @@ class DirectStreamInterceptor(
             mimeType,
             encoding,
             upstream.statusCode,
-            upstream.reasonPhrase,
+            statusPhrase(upstream.statusCode, upstream.reasonPhrase),
             filterResponseHeaders(upstream.headers),
             bodyStream,
         )
@@ -250,7 +250,7 @@ class DirectStreamInterceptor(
 
         return try {
             val statusCode = connection.responseCode
-            val reasonPhrase = connection.responseMessage ?: "OK"
+            val reasonPhrase = statusPhrase(statusCode, connection.responseMessage)
             val input = if (statusCode >= 400) connection.errorStream else connection.inputStream
             val body = input?.use { it.readFully() } ?: ByteArray(0)
             val responseHeaders = linkedMapOf<String, String>()
@@ -431,6 +431,30 @@ class DirectStreamInterceptor(
             statusCode,
             JSONObject().put("error", message).toString(),
         )
+    }
+
+    private fun statusPhrase(statusCode: Int, candidate: String?): String {
+        val normalized = candidate?.trim().orEmpty()
+        if (normalized.isNotEmpty()) return normalized
+
+        return when (statusCode) {
+            200 -> "OK"
+            204 -> "No Content"
+            206 -> "Partial Content"
+            301 -> "Moved Permanently"
+            302 -> "Found"
+            304 -> "Not Modified"
+            400 -> "Bad Request"
+            401 -> "Unauthorized"
+            403 -> "Forbidden"
+            404 -> "Not Found"
+            405 -> "Method Not Allowed"
+            416 -> "Range Not Satisfiable"
+            500 -> "Internal Server Error"
+            502 -> "Bad Gateway"
+            503 -> "Service Unavailable"
+            else -> "OK"
+        }
     }
 
     private fun InputStream.readFully(): ByteArray {
