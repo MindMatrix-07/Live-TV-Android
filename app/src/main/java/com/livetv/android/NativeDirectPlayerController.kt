@@ -19,6 +19,7 @@ import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
 import androidx.media3.exoplayer.drm.FrameworkMediaDrm
 import androidx.media3.exoplayer.drm.LocalMediaDrmCallback
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.PlayerView
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
@@ -86,8 +87,18 @@ class NativeDirectPlayerController(
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
         buildDrmSessionManagerProvider(config)?.let(mediaSourceFactory::setDrmSessionManagerProvider)
 
+        val trackSelector =
+            DefaultTrackSelector(context).apply {
+                setParameters(
+                    buildUponParameters()
+                        .setForceHighestSupportedBitrate(true)
+                        .build(),
+                )
+            }
+
         val exoPlayer =
             ExoPlayer.Builder(context)
+                .setTrackSelector(trackSelector)
                 .setMediaSourceFactory(mediaSourceFactory)
                 .build()
 
