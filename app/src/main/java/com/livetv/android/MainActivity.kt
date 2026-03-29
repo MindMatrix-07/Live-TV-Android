@@ -318,6 +318,7 @@ class MainActivity : AppCompatActivity() {
             debugLogsButtonUnlocked &&
                 (state.channel != null || state.loading.visible || nativeChannelBrowserVisible || nativeJioPanelVisible || nativeSettingsPanelVisible)
         syncNativePlayback(state)
+        updateWebViewFocusPolicy(state)
         renderNativeLoading(state)
         renderNativeWatchPanel(state)
         renderNativeChannelBrowser(state)
@@ -361,8 +362,23 @@ class MainActivity : AppCompatActivity() {
         binding.webView.alpha = if (suppressed) 0f else 1f
         binding.webView.visibility = if (fullyHidden) View.INVISIBLE else View.VISIBLE
         binding.webView.isClickable = !suppressed
-        binding.webView.isFocusable = !suppressed
-        binding.webView.isFocusableInTouchMode = !suppressed
+    }
+
+    private fun updateWebViewFocusPolicy(state: NativeWatchUiState) {
+        val shouldBlockKeyboardFocus =
+            state.channel != null ||
+                state.loading.visible ||
+                state.isMenuVisible ||
+                nativeChannelBrowserVisible ||
+                nativeJioPanelVisible ||
+                nativeSettingsPanelVisible
+
+        binding.webView.isFocusable = !shouldBlockKeyboardFocus
+        binding.webView.isFocusableInTouchMode = !shouldBlockKeyboardFocus
+
+        if (shouldBlockKeyboardFocus) {
+            binding.webView.clearFocus()
+        }
     }
 
     private fun renderNativeLoading(state: NativeWatchUiState) {
