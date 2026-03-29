@@ -132,6 +132,9 @@ class MainActivity : AppCompatActivity() {
         binding.nativeFullscreenButton.setOnClickListener {
             dispatchWatchCommand("window.AndroidWatchClient?.toggleFullscreen?.();")
         }
+        binding.nativeCopyLogsButton.setOnClickListener {
+            triggerNativeLogCopy()
+        }
 
         binding.nativeOpenChannelsButton.setOnClickListener {
             clearNativeDigitBuffer()
@@ -224,6 +227,8 @@ class MainActivity : AppCompatActivity() {
         if (state.loading.visible) {
             nativeChannelBrowserVisible = false
         }
+        binding.nativeCopyLogsButton.isVisible =
+            state.channel != null || state.loading.visible || nativeChannelBrowserVisible || nativeJioPanelVisible
         syncNativePlayback(state)
         renderNativeLoading(state)
         renderNativeWatchPanel(state)
@@ -489,6 +494,32 @@ class MainActivity : AppCompatActivity() {
         renderNativeTuneBuffer()
         renderNativeWatchState(nativeWatchViewModel.uiState.value)
         dispatchWatchCommand("window.AndroidWatchClient?.selectChannel?.(${JSONObject.quote(channelId)});")
+    }
+
+    private fun triggerNativeLogCopy() {
+        val script =
+            """
+            (() => {
+              try {
+                if (window.AndroidWatchClient?.copyLogs) {
+                  window.AndroidWatchClient.copyLogs();
+                  return 'web';
+                }
+              } catch (_error) {}
+              return 'fallback';
+            })();
+            """.trimIndent()
+
+        runCatching {
+            binding.webView.evaluateJavascript(script) { result ->
+                if (result?.contains("web") == true) {
+                    return@evaluateJavascript
+                }
+                androidLogsBridge.copyText(DebugLogStore.dump())
+            }
+        }.getOrElse {
+            androidLogsBridge.copyText(DebugLogStore.dump())
+        }
     }
 
     private fun appendNativeDigit(digit: Int) {
