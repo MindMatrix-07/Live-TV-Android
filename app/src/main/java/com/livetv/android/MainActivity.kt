@@ -339,7 +339,7 @@ class MainActivity : AppCompatActivity() {
             if (nativePlayerController.isActive()) {
                 nativePlayerController.close()
             }
-            setWebViewRenderingSuppressed(false)
+            setWebViewRenderingSuppressed(suppressed = false, fullyHidden = false)
             return
         }
 
@@ -351,11 +351,15 @@ class MainActivity : AppCompatActivity() {
                 false
             }
 
-        setWebViewRenderingSuppressed(opened)
+        setWebViewRenderingSuppressed(
+            suppressed = opened,
+            fullyHidden = opened && !state.loading.visible,
+        )
     }
 
-    private fun setWebViewRenderingSuppressed(suppressed: Boolean) {
+    private fun setWebViewRenderingSuppressed(suppressed: Boolean, fullyHidden: Boolean) {
         binding.webView.alpha = if (suppressed) 0f else 1f
+        binding.webView.visibility = if (fullyHidden) View.INVISIBLE else View.VISIBLE
         binding.webView.isClickable = !suppressed
         binding.webView.isFocusable = !suppressed
         binding.webView.isFocusableInTouchMode = !suppressed
