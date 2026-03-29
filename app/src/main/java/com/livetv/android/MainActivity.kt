@@ -156,7 +156,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderNativeWatchPanel(state: NativeWatchUiState) {
-        val shouldShowPanel = ENABLE_NATIVE_WATCH_PANEL && state.isMenuVisible && !state.loading.visible
+        val shouldShowPanel =
+            ENABLE_NATIVE_WATCH_PANEL &&
+                state.channel != null &&
+                state.isMenuVisible &&
+                !state.loading.visible
         binding.nativeWatchPanel.isVisible = shouldShowPanel
         if (!shouldShowPanel) return
 
