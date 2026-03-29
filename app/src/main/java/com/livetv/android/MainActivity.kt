@@ -53,6 +53,7 @@ class MainActivity : AppCompatActivity() {
     private var latestNativeWatchState: NativeWatchUiState = NativeWatchUiState()
     private var nativeChannelBrowserVisible = false
     private var nativeJioPanelVisible = false
+    private var nativeSettingsPanelVisible = false
     private var nativeJioPanelMode = NativeJioPanelMode.OTP
     private var nativeJioSearchQuery = ""
     private val nativeDigitHandler = Handler(Looper.getMainLooper())
@@ -65,6 +66,7 @@ class MainActivity : AppCompatActivity() {
     private var activeValidatedNetwork: Network? = null
     private var activeNetworkTransport = "unknown"
     private var pendingNetworkReloadReason = ""
+    private var autoLaunchOnBootEnabled = false
     private val directStreamInterceptor = DirectStreamInterceptor(TARGET_HOST)
 
     private enum class NativeJioPanelMode {
@@ -136,6 +138,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         connectivityManager = getSystemService(ConnectivityManager::class.java)
+        autoLaunchOnBootEnabled = BootLaunchPreferences.isEnabled(this)
         androidLogsBridge = AndroidLogsBridge(this)
         nativePlayerController = NativeDirectPlayerController(this, binding.nativePlayerView)
         androidNativePlayerBridge = AndroidNativePlayerBridge(nativePlayerController)
@@ -220,6 +223,7 @@ class MainActivity : AppCompatActivity() {
             nativeJioPanelVisible = !nativeJioPanelVisible
             if (nativeJioPanelVisible) {
                 nativeChannelBrowserVisible = false
+                nativeSettingsPanelVisible = false
                 nativeJioPanelMode =
                     if (latestNativeWatchState.jio.authenticated) {
                         NativeJioPanelMode.SEARCH
@@ -236,6 +240,22 @@ class MainActivity : AppCompatActivity() {
         binding.nativeCloseJioButton.setOnClickListener {
             nativeJioPanelVisible = false
             renderNativeWatchState(latestNativeWatchState)
+        }
+        binding.nativeOpenSettingsButton.setOnClickListener {
+            toggleNativeSettingsPanel()
+        }
+        binding.nativeCloseSettingsButton.setOnClickListener {
+            nativeSettingsPanelVisible = false
+            renderNativeWatchState(latestNativeWatchState)
+        }
+        binding.nativeAutoLaunchBootButton.setOnClickListener {
+            autoLaunchOnBootEnabled = !autoLaunchOnBootEnabled
+            BootLaunchPreferences.setEnabled(this, autoLaunchOnBootEnabled)
+            DebugLogStore.add(
+                "Settings",
+                "Auto launch on boot ${if (autoLaunchOnBootEnabled) "enabled" else "disabled"}",
+            )
+            renderNativeSettingsPanel()
         }
 
         binding.nativeJioOtpModeButton.setOnClickListener {
@@ -295,13 +315,15 @@ class MainActivity : AppCompatActivity() {
         }
         binding.nativeCopyLogsButton.isVisible =
             debugLogsButtonUnlocked &&
-                (state.channel != null || state.loading.visible || nativeChannelBrowserVisible || nativeJioPanelVisible)
+                (state.channel != null || state.loading.visible || nativeChannelBrowserVisible || nativeJioPanelVisible || nativeSettingsPanelVisible)
         syncNativePlayback(state)
         renderNativeLoading(state)
         renderNativeWatchPanel(state)
         renderNativeChannelBrowser(state)
         renderNativeJioPanel(state)
+        renderNativeSettingsPanel()
         renderNativeTuneBuffer()
+        requestFocusForActiveOverlay(state)
     }
 
     private fun syncNativePlayback(state: NativeWatchUiState) {
@@ -393,7 +415,7 @@ class MainActivity : AppCompatActivity() {
         val shouldShowPanel =
             ENABLE_NATIVE_WATCH_PANEL &&
                 state.channel != null &&
-                (state.isMenuVisible || nativeChannelBrowserVisible || nativeJioPanelVisible) &&
+                (state.isMenuVisible || nativeChannelBrowserVisible || nativeJioPanelVisible || nativeSettingsPanelVisible) &&
                 !state.loading.visible
         binding.nativeWatchPanel.isVisible = shouldShowPanel
         if (!shouldShowPanel) return
@@ -441,6 +463,12 @@ class MainActivity : AppCompatActivity() {
                 state.jio.loading -> "Jio..."
                 state.jio.authenticated -> "Jio Ready"
                 else -> "Jio Login"
+            }
+        binding.nativeOpenSettingsButton.text =
+            if (autoLaunchOnBootEnabled) {
+                "Settings • Boot On"
+            } else {
+                "Settings"
             }
     }
 
@@ -528,8 +556,83 @@ class MainActivity : AppCompatActivity() {
         nativeJioCatalogAdapter.submitList(filteredCatalog)
     }
 
+    private fun renderNativeSettingsPanel() {
+        binding.nativeSettingsPanel.isVisible = nativeSettingsPanelVisible
+        if (!nativeSettingsPanelVisible) return
+
+        binding.nativeAutoLaunchBootButton.text =
+            if (autoLaunchOnBootEnabled) {
+                "Auto launch on boot: On"
+            } else {
+                "Auto launch on boot: Off"
+            }
+        binding.nativeAutoLaunchBootButton.setBackgroundColor(
+            Color.parseColor(if (autoLaunchOnBootEnabled) "#2AFFFFFF" else "#22FFFFFF"),
+        )
+        binding.nativeAutoLaunchBootSummary.text =
+            if (autoLaunchOnBootEnabled) {
+                "Enabled. Live TV will try to launch after the device boots. Some TVs may still require the app to be opened once first."
+            } else {
+                "Disabled. Live TV will not auto-open after boot."
+            }
+    }
+
+    private fun requestFocusForActiveOverlay(state: NativeWatchUiState) {
+        if (state.loading.visible) return
+
+        when {
+            nativeJioPanelVisible -> {
+                if (isFocusInside(binding.nativeJioPanel)) return
+                binding.nativeJioPanel.post {
+                    when (nativeJioPanelMode) {
+                        NativeJioPanelMode.OTP -> binding.nativeJioPhoneInput.requestFocus()
+                        NativeJioPanelMode.IMPORT -> binding.nativeJioImportPayloadInput.requestFocus()
+                        NativeJioPanelMode.SEARCH -> binding.nativeJioSearchInput.requestFocus()
+                    }
+                }
+            }
+
+            nativeSettingsPanelVisible -> {
+                if (isFocusInside(binding.nativeSettingsPanel)) return
+                binding.nativeSettingsPanel.post {
+                    binding.nativeAutoLaunchBootButton.requestFocus()
+                }
+            }
+
+            nativeChannelBrowserVisible -> {
+                if (isFocusInside(binding.nativeChannelBrowserPanel)) return
+                val selectedIndex = state.channels.indexOfFirst { it.isSelected }
+                binding.nativeChannelBrowserPanel.post {
+                    if (selectedIndex >= 0) {
+                        binding.nativeChannelBrowserList.scrollToPosition(selectedIndex)
+                        binding.nativeChannelBrowserList.findViewHolderForAdapterPosition(selectedIndex)?.itemView?.requestFocus()
+                            ?: binding.nativeCloseChannelBrowserButton.requestFocus()
+                    } else {
+                        binding.nativeCloseChannelBrowserButton.requestFocus()
+                    }
+                }
+            }
+
+            binding.nativeWatchPanel.isVisible -> {
+                if (isFocusInside(binding.nativeWatchPanel)) return
+                binding.nativeWatchPanel.post {
+                    binding.nativeOpenChannelsButton.requestFocus()
+                }
+            }
+        }
+    }
+
+    private fun isFocusInside(container: View): Boolean {
+        var focused: View? = currentFocus
+        while (focused != null) {
+            if (focused === container) return true
+            focused = focused.parent as? View
+        }
+        return false
+    }
+
     private fun renderNativeTuneBuffer() {
-        val shouldShowBuffer = nativeDigitBuffer.isNotBlank() && !nativeJioPanelVisible
+        val shouldShowBuffer = nativeDigitBuffer.isNotBlank() && !nativeJioPanelVisible && !nativeSettingsPanelVisible
         binding.nativeTuneBufferBadge.isVisible = shouldShowBuffer
         if (!shouldShowBuffer) return
 
@@ -537,7 +640,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleNativeChannelDelta(delta: Int) {
-        if (nativeJioPanelVisible) return
+        if (nativeJioPanelVisible || nativeSettingsPanelVisible) return
         val channels = latestNativeWatchState.channels
         if (channels.isEmpty()) return
 
@@ -555,12 +658,26 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleNativeChannelSelection(channelId: String) {
         if (channelId.isBlank()) return
+        nativeSettingsPanelVisible = false
         nativeWatchViewModel.previewChannelSelection(channelId)
         nativeDigitHandler.removeCallbacks(nativeDigitCommitRunnable)
         nativeDigitBuffer = ""
         renderNativeTuneBuffer()
         renderNativeWatchState(nativeWatchViewModel.uiState.value)
         dispatchWatchCommand("window.AndroidWatchClient?.selectChannel?.(${JSONObject.quote(channelId)});")
+    }
+
+    private fun toggleNativeSettingsPanel(forceVisible: Boolean? = null) {
+        clearNativeDigitBuffer()
+        nativeSettingsPanelVisible = forceVisible ?: !nativeSettingsPanelVisible
+        if (nativeSettingsPanelVisible) {
+            nativeChannelBrowserVisible = false
+            nativeJioPanelVisible = false
+            if (!latestNativeWatchState.isMenuVisible) {
+                dispatchWatchCommand("window.AndroidWatchClient?.showMenu?.();")
+            }
+        }
+        renderNativeWatchState(latestNativeWatchState)
     }
 
     private fun triggerNativeLogCopy() {
@@ -841,6 +958,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (nativeSettingsPanelVisible && keyCode == KeyEvent.KEYCODE_BACK) {
+            nativeSettingsPanelVisible = false
+            clearNativeDigitBuffer()
+            renderNativeWatchState(latestNativeWatchState)
+            return true
+        }
         if (nativeJioPanelVisible && keyCode == KeyEvent.KEYCODE_BACK) {
             nativeJioPanelVisible = false
             clearNativeDigitBuffer()
@@ -869,11 +992,31 @@ class MainActivity : AppCompatActivity() {
             return super.onKeyDown(keyCode, event)
         }
 
-        val menuPanelsOpen = nativeChannelBrowserVisible || nativeJioPanelVisible
+        val menuPanelsOpen = nativeChannelBrowserVisible || nativeJioPanelVisible || nativeSettingsPanelVisible
 
         when (keyCode) {
             KeyEvent.KEYCODE_L -> {
                 if (registerDebugLogsUnlockPress()) {
+                    return true
+                }
+            }
+
+            KeyEvent.KEYCODE_SETTINGS -> {
+                toggleNativeSettingsPanel()
+                return true
+            }
+
+            KeyEvent.KEYCODE_GUIDE,
+            KeyEvent.KEYCODE_INFO,
+            -> {
+                if (!menuPanelsOpen && latestNativeWatchState.channel != null) {
+                    dispatchWatchCommand(
+                        if (latestNativeWatchState.isMenuVisible) {
+                            "window.AndroidWatchClient?.hideMenu?.();"
+                        } else {
+                            "window.AndroidWatchClient?.showMenu?.();"
+                        },
+                    )
                     return true
                 }
             }
@@ -919,6 +1062,20 @@ class MainActivity : AppCompatActivity() {
             KeyEvent.KEYCODE_DPAD_LEFT -> {
                 if (!menuPanelsOpen && !latestNativeWatchState.isMenuVisible) {
                     handleNativeChannelDelta(-1)
+                    return true
+                }
+            }
+
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                if (!menuPanelsOpen && !latestNativeWatchState.isMenuVisible && latestNativeWatchState.channel != null) {
+                    dispatchWatchCommand("window.AndroidWatchClient?.showMenu?.();")
+                    return true
+                }
+            }
+
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                if (!menuPanelsOpen && !latestNativeWatchState.isMenuVisible && latestNativeWatchState.channel != null) {
+                    dispatchWatchCommand("window.AndroidWatchClient?.showMenu?.();")
                     return true
                 }
             }

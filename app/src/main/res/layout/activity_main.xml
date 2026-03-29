@@ -205,6 +205,9 @@
                     android:layout_weight="1"
                     android:backgroundTint="#18FFFFFF"
                     android:minHeight="40dp"
+                    android:nextFocusDown="@id/nativePreviousButton"
+                    android:nextFocusLeft="@id/nativeOpenSettingsButton"
+                    android:nextFocusRight="@id/nativeOpenJioButton"
                     android:text="Channels"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white"
@@ -218,7 +221,26 @@
                     android:layout_weight="1"
                     android:backgroundTint="#1EFFFFFF"
                     android:minHeight="40dp"
+                    android:nextFocusDown="@id/nativePreviousButton"
+                    android:nextFocusLeft="@id/nativeOpenChannelsButton"
+                    android:nextFocusRight="@id/nativeOpenSettingsButton"
                     android:text="Jio"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/nativeOpenSettingsButton"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#18FFFFFF"
+                    android:minHeight="40dp"
+                    android:nextFocusDown="@id/nativePreviousButton"
+                    android:nextFocusLeft="@id/nativeOpenJioButton"
+                    android:nextFocusRight="@id/nativeOpenChannelsButton"
+                    android:text="Settings"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white"
                     android:textSize="11sp" />
@@ -267,6 +289,9 @@
                     android:ellipsize="end"
                     android:maxLines="2"
                     android:minHeight="44dp"
+                    android:nextFocusLeft="@id/nativeNextButton"
+                    android:nextFocusRight="@id/nativeFullscreenButton"
+                    android:nextFocusUp="@id/nativeOpenChannelsButton"
                     android:paddingHorizontal="10dp"
                     android:paddingVertical="8dp"
                     android:text="Previous"
@@ -281,6 +306,9 @@
                     android:layout_marginHorizontal="8dp"
                     android:backgroundTint="#24FFFFFF"
                     android:minHeight="44dp"
+                    android:nextFocusLeft="@id/nativePreviousButton"
+                    android:nextFocusRight="@id/nativeNextButton"
+                    android:nextFocusUp="@id/nativeOpenJioButton"
                     android:text="[]"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white"
@@ -297,6 +325,9 @@
                     android:gravity="center"
                     android:maxLines="2"
                     android:minHeight="44dp"
+                    android:nextFocusLeft="@id/nativeFullscreenButton"
+                    android:nextFocusRight="@id/nativePreviousButton"
+                    android:nextFocusUp="@id/nativeOpenSettingsButton"
                     android:paddingHorizontal="10dp"
                     android:paddingVertical="8dp"
                     android:text="Next"
@@ -352,6 +383,7 @@
                     android:layout_height="36dp"
                     android:backgroundTint="#18FFFFFF"
                     android:minHeight="36dp"
+                    android:nextFocusDown="@id/nativeChannelBrowserList"
                     android:text="Close"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white"
@@ -373,6 +405,84 @@
                 android:layout_height="320dp"
                 android:layout_marginTop="12dp"
                 android:nestedScrollingEnabled="false" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/nativeSettingsPanel"
+            android:layout_width="320dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|start"
+            android:layout_marginStart="720dp"
+            android:layout_marginBottom="24dp"
+            android:background="#E1111111"
+            android:clickable="true"
+            android:focusable="true"
+            android:orientation="vertical"
+            android:padding="14dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/nativeSettingsTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Settings"
+                    android:textColor="@android:color/white"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/nativeCloseSettingsButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:backgroundTint="#18FFFFFF"
+                    android:minHeight="36dp"
+                    android:nextFocusDown="@id/nativeAutoLaunchBootButton"
+                    android:text="Close"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/nativeSettingsMessage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Control startup behavior and TV-friendly options."
+                android:textColor="#99FFFFFF"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/nativeAutoLaunchBootButton"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="14dp"
+                android:backgroundTint="#22FFFFFF"
+                android:gravity="start|center_vertical"
+                android:minHeight="52dp"
+                android:nextFocusUp="@id/nativeCloseSettingsButton"
+                android:paddingHorizontal="14dp"
+                android:text="Auto launch on boot: Off"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/nativeAutoLaunchBootSummary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="When enabled, Live TV will try to open automatically after the device boots."
+                android:textColor="#82FFFFFF"
+                android:textSize="10sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -409,6 +519,7 @@
                     android:layout_height="36dp"
                     android:backgroundTint="#18FFFFFF"
                     android:minHeight="36dp"
+                    android:nextFocusDown="@id/nativeJioOtpModeButton"
                     android:text="Close"
                     android:textAllCaps="false"
                     android:textColor="@android:color/white"
