@@ -632,6 +632,31 @@ class MainActivity : AppCompatActivity() {
         return false
     }
 
+    private fun activeOverlayContainer(): View? =
+        when {
+            nativeJioPanelVisible -> binding.nativeJioPanel
+            nativeSettingsPanelVisible -> binding.nativeSettingsPanel
+            nativeChannelBrowserVisible -> binding.nativeChannelBrowserPanel
+            binding.nativeWatchPanel.isVisible -> binding.nativeWatchPanel
+            else -> null
+        }
+
+    private fun ensureFocusInsideActiveOverlay(state: NativeWatchUiState): Boolean {
+        val overlay = activeOverlayContainer() ?: return false
+        if (isFocusInside(overlay)) return false
+        requestFocusForActiveOverlay(state)
+        return true
+    }
+
+    private fun activateFocusedOverlayAction(): Boolean {
+        val overlay = activeOverlayContainer() ?: return false
+        val focused = currentFocus ?: return false
+        if (!isFocusInside(overlay)) return false
+        if (!focused.isClickable && !focused.isLongClickable) return false
+        focused.performClick()
+        return true
+    }
+
     private fun renderNativeTuneBuffer() {
         val shouldShowBuffer = nativeDigitBuffer.isNotBlank() && !nativeJioPanelVisible && !nativeSettingsPanelVisible
         binding.nativeTuneBufferBadge.isVisible = shouldShowBuffer
@@ -998,6 +1023,22 @@ class MainActivity : AppCompatActivity() {
         }
 
         val menuPanelsOpen = nativeChannelBrowserVisible || nativeJioPanelVisible || nativeSettingsPanelVisible
+        val overlayNavigationOpen = menuPanelsOpen || (ENABLE_NATIVE_WATCH_PANEL && latestNativeWatchState.isMenuVisible)
+
+        if (
+            overlayNavigationOpen &&
+            keyCode in
+            setOf(
+                KeyEvent.KEYCODE_DPAD_UP,
+                KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_DPAD_LEFT,
+                KeyEvent.KEYCODE_DPAD_RIGHT,
+            )
+        ) {
+            if (ensureFocusInsideActiveOverlay(latestNativeWatchState)) {
+                return true
+            }
+        }
 
         when (keyCode) {
             KeyEvent.KEYCODE_L -> {
@@ -1087,8 +1128,26 @@ class MainActivity : AppCompatActivity() {
 
             KeyEvent.KEYCODE_ENTER,
             KeyEvent.KEYCODE_DPAD_CENTER,
-            KeyEvent.KEYCODE_MENU,
             -> {
+                if (overlayNavigationOpen) {
+                    if (activateFocusedOverlayAction()) {
+                        return true
+                    }
+                    if (ensureFocusInsideActiveOverlay(latestNativeWatchState)) {
+                        return true
+                    }
+                }
+                if (!menuPanelsOpen) {
+                    if (nativeDigitBuffer.isNotBlank()) {
+                        commitNativeDigitBuffer()
+                    } else {
+                        dispatchWatchCommand("window.AndroidWatchClient?.toggleMenu?.();")
+                    }
+                    return true
+                }
+            }
+
+            KeyEvent.KEYCODE_MENU -> {
                 if (!menuPanelsOpen) {
                     if (nativeDigitBuffer.isNotBlank()) {
                         commitNativeDigitBuffer()
