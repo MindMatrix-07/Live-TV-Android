@@ -3,12 +3,12 @@
     android:id="@+id/nativeProgramRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="6dp"
-    android:background="#1AFFFFFF"
+    android:layout_marginBottom="4dp"
+    android:background="#16FFFFFF"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingHorizontal="12dp"
-    android:paddingVertical="10dp">
+    android:paddingHorizontal="10dp"
+    android:paddingVertical="8dp">
 
     <LinearLayout
         android:layout_width="0dp"
@@ -23,7 +23,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="@android:color/white"
-            android:textSize="15sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
 
         <TextView
@@ -34,7 +34,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="#99FFFFFF"
-            android:textSize="11sp" />
+            android:textSize="10sp" />
     </LinearLayout>
 
     <TextView
@@ -43,11 +43,11 @@
         android:layout_height="wrap_content"
         android:background="#26FFFFFF"
         android:paddingHorizontal="8dp"
-        android:paddingVertical="4dp"
+        android:paddingVertical="3dp"
         android:text="ON AIR"
         android:textAllCaps="true"
         android:textColor="@android:color/white"
-        android:textSize="10sp"
+        android:textSize="9sp"
         android:textStyle="bold"
         android:visibility="gone" />
 

@@ -28,6 +28,9 @@ class AndroidWatchBridge(
                 channel = channelObject?.toNativeWatchChannel(),
                 loading = loadingObject.toNativeWatchLoadingState(),
                 epg = epgArray.toNativeWatchPrograms(),
+                audioTracks = payload.optJSONArray("audioTracks").toNativeWatchAudioTracks(),
+                previousChannelName = payload.optString("previousChannelName"),
+                nextChannelName = payload.optString("nextChannelName"),
                 isMenuVisible = payload.optBoolean("menuVisible", false),
                 isNativePlayerActive = payload.optBoolean("nativePlayerActive", false),
             )
@@ -66,6 +69,25 @@ class AndroidWatchBridge(
                         subtitle = item.optString("subtitle"),
                         isPlaceholder = item.optBoolean("isPlaceholder", false),
                         isCurrent = item.optBoolean("isCurrent", false),
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun JSONArray?.toNativeWatchAudioTracks(): List<NativeWatchAudioTrack> {
+        if (this == null) return emptyList()
+        return buildList {
+            for (index in 0 until length()) {
+                val item = optJSONObject(index) ?: continue
+                val trackId = item.optString("id")
+                if (trackId.isBlank()) continue
+                add(
+                    NativeWatchAudioTrack(
+                        id = trackId,
+                        label = item.optString("label").ifBlank { "Track ${index + 1}" },
+                        shortLabel = item.optString("shortLabel").ifBlank { item.optString("label").ifBlank { "Track ${index + 1}" } },
+                        selected = item.optBoolean("selected", false),
                     ),
                 )
             }

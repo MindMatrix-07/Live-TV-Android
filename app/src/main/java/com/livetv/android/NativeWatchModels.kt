@@ -15,6 +15,13 @@ data class NativeWatchProgram(
     val isCurrent: Boolean = false,
 )
 
+data class NativeWatchAudioTrack(
+    val id: String,
+    val label: String,
+    val shortLabel: String,
+    val selected: Boolean = false,
+)
+
 data class NativeWatchLoadingState(
     val visible: Boolean = false,
     val label: String = "",
@@ -25,6 +32,9 @@ data class NativeWatchUiState(
     val channel: NativeWatchChannel? = null,
     val loading: NativeWatchLoadingState = NativeWatchLoadingState(),
     val epg: List<NativeWatchProgram> = emptyList(),
+    val audioTracks: List<NativeWatchAudioTrack> = emptyList(),
+    val previousChannelName: String = "",
+    val nextChannelName: String = "",
     val isMenuVisible: Boolean = false,
     val isNativePlayerActive: Boolean = false,
 )

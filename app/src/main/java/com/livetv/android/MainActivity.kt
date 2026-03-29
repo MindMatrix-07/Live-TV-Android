@@ -28,6 +28,7 @@ import coil.load
 import kotlinx.coroutines.flow.collectLatest
 import com.livetv.android.databinding.ActivityMainBinding
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
 
@@ -38,6 +39,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var nativeWatchViewModel: NativeWatchViewModel
     private lateinit var androidWatchBridge: AndroidWatchBridge
     private lateinit var nativeWatchProgramAdapter: NativeWatchProgramAdapter
+    private lateinit var nativeWatchAudioTrackAdapter: NativeWatchAudioTrackAdapter
+    private var latestNativeWatchState: NativeWatchUiState = NativeWatchUiState()
     private val directStreamInterceptor = DirectStreamInterceptor(TARGET_HOST)
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -53,6 +56,9 @@ class MainActivity : AppCompatActivity() {
         nativeWatchViewModel = ViewModelProvider(this)[NativeWatchViewModel::class.java]
         androidWatchBridge = AndroidWatchBridge(nativeWatchViewModel)
         nativeWatchProgramAdapter = NativeWatchProgramAdapter()
+        nativeWatchAudioTrackAdapter = NativeWatchAudioTrackAdapter { track ->
+            dispatchWatchCommand("window.AndroidWatchClient?.selectAudioTrack?.(${JSONObject.quote(track.id)});")
+        }
         DebugLogStore.add("MainActivity", "App created")
 
         setupNativeWatchOverlay()
@@ -66,6 +72,22 @@ class MainActivity : AppCompatActivity() {
             adapter = nativeWatchProgramAdapter
             itemAnimator = null
         }
+
+        binding.nativeWatchAudioList.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity, LinearLayoutManager.HORIZONTAL, false)
+            adapter = nativeWatchAudioTrackAdapter
+            itemAnimator = null
+        }
+
+        binding.nativePreviousButton.setOnClickListener {
+            dispatchWatchCommand("window.AndroidWatchClient?.previousChannel?.();")
+        }
+        binding.nativeNextButton.setOnClickListener {
+            dispatchWatchCommand("window.AndroidWatchClient?.nextChannel?.();")
+        }
+        binding.nativeFullscreenButton.setOnClickListener {
+            dispatchWatchCommand("window.AndroidWatchClient?.toggleFullscreen?.();")
+        }
     }
 
     private fun observeNativeWatchState() {
@@ -77,6 +99,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderNativeWatchState(state: NativeWatchUiState) {
+        latestNativeWatchState = state
         renderNativeLoading(state)
         renderNativeWatchPanel(state)
     }
@@ -135,8 +158,44 @@ class MainActivity : AppCompatActivity() {
                 append(state.channel?.id?.ifBlank { "--" } ?: "--")
                 append(" • ")
                 append(playbackLabel.uppercase())
+                if (state.channel?.isDirectStream == true) {
+                    append(" • DIRECT")
+                }
             }
         nativeWatchProgramAdapter.submitList(state.epg)
+
+        val hasAudioTracks = state.audioTracks.size > 1
+        binding.nativeWatchAudioSection.isVisible = hasAudioTracks
+        if (hasAudioTracks) {
+            binding.nativeWatchAudioLabel.text =
+                state.audioTracks.firstOrNull { it.selected }?.label?.let { "Audio • $it" } ?: "Audio"
+            nativeWatchAudioTrackAdapter.submitList(state.audioTracks)
+        } else {
+            nativeWatchAudioTrackAdapter.submitList(emptyList())
+        }
+
+        binding.nativePreviousButton.text =
+            if (state.previousChannelName.isBlank()) {
+                "Previous"
+            } else {
+                "Previous\n${state.previousChannelName}"
+            }
+        binding.nativeNextButton.text =
+            if (state.nextChannelName.isBlank()) {
+                "Next"
+            } else {
+                "Next\n${state.nextChannelName}"
+            }
+    }
+
+    private fun dispatchWatchCommand(script: String) {
+        binding.webView.post {
+            try {
+                binding.webView.evaluateJavascript(script, null)
+            } catch (error: Throwable) {
+                DebugLogStore.add("AndroidWatch", "Command failed: $script", error)
+            }
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -264,6 +323,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (ENABLE_NATIVE_WATCH_PANEL && latestNativeWatchState.isMenuVisible) {
+            if (keyCode == KeyEvent.KEYCODE_BACK) {
+                dispatchWatchCommand("window.AndroidWatchClient?.hideMenu?.();")
+                return true
+            }
+        }
+
         // Handle Back button for WebView navigation
         if (keyCode == KeyEvent.KEYCODE_BACK && binding.webView.canGoBack()) {
             binding.webView.goBack()
@@ -300,7 +366,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val TARGET_URL = "https://jiolivetv.vercel.app"
         private const val TARGET_HOST = "jiolivetv.vercel.app"
-        private const val ENABLE_NATIVE_WATCH_PANEL = false
+        private const val ENABLE_NATIVE_WATCH_PANEL = true
         private const val DIRECT_STREAM_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 13; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
     }

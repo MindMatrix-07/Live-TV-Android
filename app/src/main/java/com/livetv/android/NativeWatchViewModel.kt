@@ -14,6 +14,9 @@ class NativeWatchViewModel : ViewModel() {
         channel: NativeWatchChannel?,
         loading: NativeWatchLoadingState,
         epg: List<NativeWatchProgram>,
+        audioTracks: List<NativeWatchAudioTrack>,
+        previousChannelName: String,
+        nextChannelName: String,
         isMenuVisible: Boolean,
         isNativePlayerActive: Boolean,
     ) {
@@ -22,6 +25,9 @@ class NativeWatchViewModel : ViewModel() {
                 channel = channel,
                 loading = loading.copy(progress = loading.progress.coerceIn(0, 100)),
                 epg = epg,
+                audioTracks = audioTracks,
+                previousChannelName = previousChannelName,
+                nextChannelName = nextChannelName,
                 isMenuVisible = isMenuVisible,
                 isNativePlayerActive = isNativePlayerActive,
             )
