@@ -1,6 +1,9 @@
 package com.livetv.android
 
 import android.annotation.SuppressLint
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.graphics.Color
 import android.graphics.Bitmap
 import android.os.Build
@@ -53,7 +56,15 @@ class MainActivity : AppCompatActivity() {
     private var nativeJioPanelMode = NativeJioPanelMode.OTP
     private var nativeJioSearchQuery = ""
     private val nativeDigitHandler = Handler(Looper.getMainLooper())
+    private val networkRecoveryHandler = Handler(Looper.getMainLooper())
     private var nativeDigitBuffer = ""
+    private lateinit var connectivityManager: ConnectivityManager
+    private val debugLogUnlockPresses = ArrayDeque<Long>()
+    private var debugLogsButtonUnlocked = false
+    private var lastMainFrameLoadFailed = false
+    private var activeValidatedNetwork: Network? = null
+    private var activeNetworkTransport = "unknown"
+    private var pendingNetworkReloadReason = ""
     private val directStreamInterceptor = DirectStreamInterceptor(TARGET_HOST)
 
     private enum class NativeJioPanelMode {
@@ -63,6 +74,59 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val nativeDigitCommitRunnable = Runnable { commitNativeDigitBuffer() }
+    private val networkRecoveryRunnable = Runnable {
+        reloadWebViewForActiveNetwork(pendingNetworkReloadReason.ifBlank { "network available" })
+    }
+    private val networkCallback =
+        object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                DebugLogStore.add("Network", "Network available")
+            }
+
+            override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
+                val hasValidatedInternet =
+                    networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                        networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                val transport = describeNetworkTransport(networkCapabilities)
+
+                binding.webView.post {
+                    binding.webView.setNetworkAvailable(hasValidatedInternet)
+                }
+
+                if (!hasValidatedInternet) return
+
+                val switchedNetwork = activeValidatedNetwork != network || activeNetworkTransport != transport
+                activeValidatedNetwork = network
+                activeNetworkTransport = transport
+                runCatching { connectivityManager.bindProcessToNetwork(network) }
+                DebugLogStore.add("Network", "Using $transport network")
+
+                val webViewUrl = binding.webView.url.orEmpty()
+                val shouldRecover =
+                    lastMainFrameLoadFailed ||
+                        webViewUrl.isBlank() ||
+                        webViewUrl == "about:blank" ||
+                        (switchedNetwork && !nativePlayerController.isActive())
+
+                if (shouldRecover) {
+                    pendingNetworkReloadReason = "switched to $transport"
+                    networkRecoveryHandler.removeCallbacks(networkRecoveryRunnable)
+                    networkRecoveryHandler.postDelayed(networkRecoveryRunnable, 900L)
+                }
+            }
+
+            override fun onLost(network: Network) {
+                if (activeValidatedNetwork == network) {
+                    activeValidatedNetwork = null
+                    activeNetworkTransport = "unknown"
+                    runCatching { connectivityManager.bindProcessToNetwork(null) }
+                    binding.webView.post {
+                        binding.webView.setNetworkAvailable(false)
+                    }
+                    DebugLogStore.add("Network", "Validated network lost")
+                }
+            }
+        }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,6 +135,7 @@ class MainActivity : AppCompatActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        connectivityManager = getSystemService(ConnectivityManager::class.java)
         androidLogsBridge = AndroidLogsBridge(this)
         nativePlayerController = NativeDirectPlayerController(this, binding.nativePlayerView)
         androidNativePlayerBridge = AndroidNativePlayerBridge(nativePlayerController)
@@ -95,6 +160,7 @@ class MainActivity : AppCompatActivity() {
 
         setupNativeWatchOverlay()
         observeNativeWatchState()
+        registerNetworkMonitoring()
         setupWebView()
     }
 
@@ -228,7 +294,8 @@ class MainActivity : AppCompatActivity() {
             nativeChannelBrowserVisible = false
         }
         binding.nativeCopyLogsButton.isVisible =
-            state.channel != null || state.loading.visible || nativeChannelBrowserVisible || nativeJioPanelVisible
+            debugLogsButtonUnlocked &&
+                (state.channel != null || state.loading.visible || nativeChannelBrowserVisible || nativeJioPanelVisible)
         syncNativePlayback(state)
         renderNativeLoading(state)
         renderNativeWatchPanel(state)
@@ -592,6 +659,55 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun registerNetworkMonitoring() {
+        runCatching {
+            connectivityManager.registerDefaultNetworkCallback(networkCallback)
+        }.onFailure { error ->
+            DebugLogStore.add("Network", "Failed to register network callback", error)
+        }
+    }
+
+    private fun reloadWebViewForActiveNetwork(reason: String) {
+        if (nativePlayerController.isActive()) return
+
+        binding.webView.post {
+            DebugLogStore.add("Network", "Reloading WebView after $reason")
+            val currentUrl = binding.webView.url.orEmpty()
+            if (currentUrl.isBlank() || currentUrl == "about:blank") {
+                binding.webView.loadUrl(TARGET_URL)
+            } else {
+                binding.webView.reload()
+            }
+        }
+    }
+
+    private fun describeNetworkTransport(capabilities: NetworkCapabilities): String =
+        when {
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> "vpn"
+            else -> "unknown"
+        }
+
+    private fun registerDebugLogsUnlockPress(): Boolean {
+        val now = System.currentTimeMillis()
+        while (debugLogUnlockPresses.isNotEmpty() && now - debugLogUnlockPresses.first() > DEBUG_LOG_UNLOCK_WINDOW_MS) {
+            debugLogUnlockPresses.removeFirst()
+        }
+        debugLogUnlockPresses.addLast(now)
+
+        if (!debugLogsButtonUnlocked && debugLogUnlockPresses.size >= DEBUG_LOG_UNLOCK_PRESS_COUNT) {
+            debugLogsButtonUnlocked = true
+            debugLogUnlockPresses.clear()
+            DebugLogStore.add("MainActivity", "Debug logs button unlocked")
+            renderNativeWatchState(latestNativeWatchState)
+            return true
+        }
+
+        return false
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         with(binding.webView) {
@@ -658,6 +774,7 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                     super.onPageStarted(view, url, favicon)
+                    lastMainFrameLoadFailed = false
                     DebugLogStore.add("WebView", "Page started ${url ?: "unknown"}")
                     view?.evaluateJavascript(
                         """
@@ -677,6 +794,7 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
+                    lastMainFrameLoadFailed = false
                     DebugLogStore.add("WebView", "Page finished ${url ?: "unknown"}")
                     view?.let { injectAndroidTvShell(it) }
                 }
@@ -688,6 +806,9 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     super.onReceivedError(view, request, error)
                     if (request?.isForMainFrame == true || request?.url?.host == TARGET_HOST) {
+                        if (request?.isForMainFrame == true) {
+                            lastMainFrameLoadFailed = true
+                        }
                         DebugLogStore.add(
                             "WebView",
                             "Request error ${request.url} code=${error?.errorCode} desc=${error?.description ?: "unknown"}",
@@ -703,6 +824,9 @@ class MainActivity : AppCompatActivity() {
                     super.onReceivedHttpError(view, request, errorResponse)
                     val url = request?.url?.toString().orEmpty()
                     if (request?.isForMainFrame == true || url.contains("/api/")) {
+                        if (request?.isForMainFrame == true) {
+                            lastMainFrameLoadFailed = true
+                        }
                         DebugLogStore.add(
                             "WebView",
                             "HTTP ${errorResponse?.statusCode ?: -1} ${request?.method ?: "GET"} $url",
@@ -748,6 +872,12 @@ class MainActivity : AppCompatActivity() {
         val menuPanelsOpen = nativeChannelBrowserVisible || nativeJioPanelVisible
 
         when (keyCode) {
+            KeyEvent.KEYCODE_L -> {
+                if (registerDebugLogsUnlockPress()) {
+                    return true
+                }
+            }
+
             KeyEvent.KEYCODE_0,
             KeyEvent.KEYCODE_1,
             KeyEvent.KEYCODE_2,
@@ -829,6 +959,9 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         DebugLogStore.add("MainActivity", "App destroyed")
         nativeDigitHandler.removeCallbacksAndMessages(null)
+        networkRecoveryHandler.removeCallbacksAndMessages(null)
+        runCatching { connectivityManager.unregisterNetworkCallback(networkCallback) }
+        runCatching { connectivityManager.bindProcessToNetwork(null) }
         nativeWatchViewModel.clear()
         nativePlayerController.close()
         with(binding.webView) {
@@ -846,6 +979,8 @@ class MainActivity : AppCompatActivity() {
         private const val TARGET_URL = "https://jiolivetv.vercel.app"
         private const val TARGET_HOST = "jiolivetv.vercel.app"
         private const val ENABLE_NATIVE_WATCH_PANEL = true
+        private const val DEBUG_LOG_UNLOCK_PRESS_COUNT = 10
+        private const val DEBUG_LOG_UNLOCK_WINDOW_MS = 5_000L
         private const val DIRECT_STREAM_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 13; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
     }
