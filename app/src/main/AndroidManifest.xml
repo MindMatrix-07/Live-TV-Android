@@ -35,12 +35,10 @@
 
         <receiver
             android:name=".BootReceiver"
-            android:directBootAware="true"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
     </application>
