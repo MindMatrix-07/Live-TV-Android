@@ -5,6 +5,12 @@
     android:layout_height="match_parent"
     android:background="@android:color/black">
 
+    <WebView
+        android:id="@+id/webView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent" />
+
     <androidx.media3.ui.PlayerView
         android:id="@+id/nativePlayerView"
         android:layout_width="match_parent"
@@ -16,14 +22,8 @@
         android:visibility="gone"
         app:resize_mode="zoom"
         app:show_buffering="never"
-        app:surface_type="surface_view"
+        app:surface_type="texture_view"
         app:use_controller="false" />
-
-    <WebView
-        android:id="@+id/webView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@android:color/transparent" />
 
     <FrameLayout
         android:id="@+id/nativeWatchOverlayRoot"
