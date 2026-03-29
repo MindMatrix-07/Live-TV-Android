@@ -37,20 +37,20 @@ class NativeDirectPlayerController(
 
     fun play(configJson: String): Boolean {
         val config = DirectStreamConfig.fromJson(configJson)
-        DebugLogStore.add(TAG, "Opening native player for ${config.channelName.ifBlank { config.channelId }}")
-
         if (config.manifestUrl.isBlank()) {
             DebugLogStore.add(TAG, "Missing manifest url for native player")
             return false
         }
 
-        val manifestUri = normalizeManifestUri(Uri.parse(config.manifestUrl))
+        val manifestUri = normalizeManifestUri(Uri.parse(config.manifestUrl), config)
         val normalizedManifestUrl = manifestUri.toString()
 
         if (activeManifestUrl == normalizedManifestUrl && player != null) {
             playerView.visibility = View.VISIBLE
             return true
         }
+
+        DebugLogStore.add(TAG, "Opening native player for ${config.channelName.ifBlank { config.channelId }}")
 
         release()
 
@@ -69,7 +69,7 @@ class NativeDirectPlayerController(
                 }
         }
 
-        val tokenEntries = buildTokenEntries(manifestUri)
+        val tokenEntries = buildTokenEntries(manifestUri, config)
 
         val httpDataSourceFactory =
             DefaultHttpDataSource.Factory()
@@ -269,8 +269,12 @@ class NativeDirectPlayerController(
         )
     }
 
-    private fun normalizeManifestUri(manifestUri: Uri): Uri {
+    private fun normalizeManifestUri(
+        manifestUri: Uri,
+        config: DirectStreamConfig,
+    ): Uri {
         if (!manifestUri.isHierarchical) return manifestUri
+        if (!config.streamType.equals("hls", ignoreCase = true)) return manifestUri
 
         val hdnea = manifestUri.getQueryParameter("hdnea")
             .orEmpty()
@@ -285,7 +289,10 @@ class NativeDirectPlayerController(
             .build()
     }
 
-    private fun buildTokenEntries(manifestUri: Uri): Map<String, String> {
+    private fun buildTokenEntries(
+        manifestUri: Uri,
+        config: DirectStreamConfig,
+    ): Map<String, String> {
         val tokens =
             linkedMapOf<String, String>().apply {
                 manifestUri.queryParameterNames.forEach { key ->
@@ -296,7 +303,7 @@ class NativeDirectPlayerController(
             }
 
         val hdnea = tokens["hdnea"].orEmpty().ifBlank { tokens["__hdnea__"].orEmpty() }
-        if (hdnea.isNotBlank()) {
+        if (hdnea.isNotBlank() && config.streamType.equals("hls", ignoreCase = true)) {
             tokens.putIfAbsent("hdnea", hdnea)
         }
 
