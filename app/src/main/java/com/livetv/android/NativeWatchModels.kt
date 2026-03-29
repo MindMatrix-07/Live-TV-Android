@@ -26,6 +26,8 @@ data class NativeWatchLoadingState(
     val visible: Boolean = false,
     val label: String = "",
     val progress: Int = 0,
+    val programTitle: String = "",
+    val programSubtitle: String = "",
 )
 
 data class NativeWatchUiState(

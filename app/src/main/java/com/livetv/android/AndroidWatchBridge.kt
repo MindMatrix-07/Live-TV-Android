@@ -55,6 +55,8 @@ class AndroidWatchBridge(
             visible = optBoolean("visible", false),
             label = optString("label"),
             progress = optInt("progress", 0),
+            programTitle = optString("programTitle"),
+            programSubtitle = optString("programSubtitle"),
         )
     }
 

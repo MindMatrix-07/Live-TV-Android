@@ -113,15 +113,23 @@ class MainActivity : AppCompatActivity() {
             binding.nativeLoadingFallbackName.isVisible = false
             binding.nativeLoadingProgress.progress = 0
             binding.nativeLoadingSubtext.text = ""
+            binding.nativeLoadingMeta.text = ""
             return
         }
 
         val fallbackName = state.channel?.name?.takeIf { it.isNotBlank() } ?: "Loading channel"
         val logoUrl = state.channel?.logoUrl
+        val loadingLabel = state.loading.label.ifBlank { "Loading $fallbackName" }
+        val programTitle = state.loading.programTitle.ifBlank { "Programme info unavailable" }
+        val programSubtitle =
+            state.loading.programSubtitle.ifBlank {
+                if (programTitle == "Programme info unavailable") fallbackName else fallbackName
+            }
 
         binding.nativeLoadingProgress.progress = state.loading.progress.coerceIn(0, 100)
-        binding.nativeLoadingText.text = state.loading.label.ifBlank { "Loading..." }
-        binding.nativeLoadingSubtext.text = fallbackName
+        binding.nativeLoadingText.text = loadingLabel
+        binding.nativeLoadingSubtext.text = programTitle
+        binding.nativeLoadingMeta.text = programSubtitle
         binding.nativeLoadingFallbackName.text = fallbackName
 
         if (logoUrl.isNullOrBlank()) {
