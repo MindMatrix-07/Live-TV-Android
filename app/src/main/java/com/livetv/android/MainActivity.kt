@@ -107,6 +107,9 @@ class MainActivity : AppCompatActivity() {
     private fun renderNativeLoading(state: NativeWatchUiState) {
         val loadingVisible = state.loading.visible
         binding.nativeLoadingContainer.isVisible = loadingVisible
+        binding.nativeLoadingContainer.setBackgroundColor(
+            if (loadingVisible && state.loading.progress < 100) Color.BLACK else Color.TRANSPARENT,
+        )
 
         if (!loadingVisible) {
             binding.nativeLoadingChannelLogo.isVisible = false
