@@ -355,7 +355,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setWebViewRenderingSuppressed(suppressed: Boolean) {
-        binding.webView.alpha = if (suppressed) 0.01f else 1f
+        binding.webView.alpha = if (suppressed) 0f else 1f
+        binding.webView.visibility = if (suppressed) View.INVISIBLE else View.VISIBLE
         binding.webView.isClickable = !suppressed
         binding.webView.isFocusable = !suppressed
         binding.webView.isFocusableInTouchMode = !suppressed
