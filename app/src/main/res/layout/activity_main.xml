@@ -32,6 +32,22 @@
         android:clickable="false"
         android:focusable="false">
 
+        <TextView
+            android:id="@+id/nativeTuneBufferBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="26dp"
+            android:background="#DD111111"
+            android:gravity="center"
+            android:minWidth="76dp"
+            android:paddingHorizontal="18dp"
+            android:paddingVertical="10dp"
+            android:textColor="@android:color/white"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
         <FrameLayout
             android:id="@+id/nativeLoadingContainer"
             android:layout_width="match_parent"

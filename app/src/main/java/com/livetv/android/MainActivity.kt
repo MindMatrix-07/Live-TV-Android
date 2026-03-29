@@ -5,6 +5,8 @@ import android.graphics.Color
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
@@ -50,6 +52,8 @@ class MainActivity : AppCompatActivity() {
     private var nativeJioPanelVisible = false
     private var nativeJioPanelMode = NativeJioPanelMode.OTP
     private var nativeJioSearchQuery = ""
+    private val nativeDigitHandler = Handler(Looper.getMainLooper())
+    private var nativeDigitBuffer = ""
     private val directStreamInterceptor = DirectStreamInterceptor(TARGET_HOST)
 
     private enum class NativeJioPanelMode {
@@ -57,6 +61,8 @@ class MainActivity : AppCompatActivity() {
         IMPORT,
         SEARCH,
     }
+
+    private val nativeDigitCommitRunnable = Runnable { commitNativeDigitBuffer() }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,8 +82,7 @@ class MainActivity : AppCompatActivity() {
         }
         nativeChannelBrowserAdapter = NativeChannelBrowserAdapter { channelItem ->
             nativeChannelBrowserVisible = false
-            renderNativeWatchState(latestNativeWatchState)
-            dispatchWatchCommand("window.AndroidWatchClient?.selectChannel?.(${JSONObject.quote(channelItem.id)});")
+            handleNativeChannelSelection(channelItem.id)
         }
         nativeJioCatalogAdapter = NativeJioCatalogAdapter { channelItem ->
             if (channelItem.imported) {
@@ -119,16 +124,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.nativePreviousButton.setOnClickListener {
-            dispatchWatchCommand("window.AndroidWatchClient?.previousChannel?.();")
+            handleNativeChannelDelta(-1)
         }
         binding.nativeNextButton.setOnClickListener {
-            dispatchWatchCommand("window.AndroidWatchClient?.nextChannel?.();")
+            handleNativeChannelDelta(1)
         }
         binding.nativeFullscreenButton.setOnClickListener {
             dispatchWatchCommand("window.AndroidWatchClient?.toggleFullscreen?.();")
         }
 
         binding.nativeOpenChannelsButton.setOnClickListener {
+            clearNativeDigitBuffer()
             nativeChannelBrowserVisible = !nativeChannelBrowserVisible
             if (nativeChannelBrowserVisible) {
                 nativeJioPanelVisible = false
@@ -141,6 +147,7 @@ class MainActivity : AppCompatActivity() {
             renderNativeWatchState(latestNativeWatchState)
         }
         binding.nativeOpenJioButton.setOnClickListener {
+            clearNativeDigitBuffer()
             nativeJioPanelVisible = !nativeJioPanelVisible
             if (nativeJioPanelVisible) {
                 nativeChannelBrowserVisible = false
@@ -221,6 +228,7 @@ class MainActivity : AppCompatActivity() {
         renderNativeWatchPanel(state)
         renderNativeChannelBrowser(state)
         renderNativeJioPanel(state)
+        renderNativeTuneBuffer()
     }
 
     private fun renderNativeLoading(state: NativeWatchUiState) {
@@ -409,8 +417,73 @@ class MainActivity : AppCompatActivity() {
                 "Loading Jio channels..."
             } else {
                 "${filteredCatalog.size} shown • ${state.jio.channels.count { it.imported }} imported"
-            }
+        }
         nativeJioCatalogAdapter.submitList(filteredCatalog)
+    }
+
+    private fun renderNativeTuneBuffer() {
+        val shouldShowBuffer = nativeDigitBuffer.isNotBlank() && !nativeJioPanelVisible
+        binding.nativeTuneBufferBadge.isVisible = shouldShowBuffer
+        if (!shouldShowBuffer) return
+
+        binding.nativeTuneBufferBadge.text = nativeDigitBuffer
+    }
+
+    private fun handleNativeChannelDelta(delta: Int) {
+        if (nativeJioPanelVisible) return
+        val channels = latestNativeWatchState.channels
+        if (channels.isEmpty()) return
+
+        clearNativeDigitBuffer()
+
+        val currentIndex =
+            channels.indexOfFirst { it.isSelected }
+                .takeIf { it >= 0 }
+                ?: channels.indexOfFirst { it.id == latestNativeWatchState.channel?.id }
+                    .takeIf { it >= 0 }
+                ?: 0
+        val nextIndex = (currentIndex + delta + channels.size) % channels.size
+        handleNativeChannelSelection(channels[nextIndex].id)
+    }
+
+    private fun handleNativeChannelSelection(channelId: String) {
+        if (channelId.isBlank()) return
+        nativeWatchViewModel.previewChannelSelection(channelId)
+        nativeDigitHandler.removeCallbacks(nativeDigitCommitRunnable)
+        nativeDigitBuffer = ""
+        renderNativeTuneBuffer()
+        renderNativeWatchState(nativeWatchViewModel.uiState.value)
+        dispatchWatchCommand("window.AndroidWatchClient?.selectChannel?.(${JSONObject.quote(channelId)});")
+    }
+
+    private fun appendNativeDigit(digit: Int) {
+        if (digit !in 0..9) return
+        nativeDigitBuffer = (nativeDigitBuffer + digit.toString()).takeLast(4)
+        renderNativeTuneBuffer()
+        dispatchWatchCommand("window.AndroidWatchClient?.showMenu?.();")
+        nativeDigitHandler.removeCallbacks(nativeDigitCommitRunnable)
+        nativeDigitHandler.postDelayed(nativeDigitCommitRunnable, 1400L)
+    }
+
+    private fun commitNativeDigitBuffer() {
+        val typedDigits = nativeDigitBuffer
+        if (typedDigits.isBlank()) return
+
+        clearNativeDigitBuffer()
+
+        val matchingChannel =
+            latestNativeWatchState.channels.firstOrNull { item ->
+                item.id.toIntOrNull() == typedDigits.toIntOrNull()
+            } ?: return
+
+        handleNativeChannelSelection(matchingChannel.id)
+    }
+
+    private fun clearNativeDigitBuffer() {
+        nativeDigitHandler.removeCallbacks(nativeDigitCommitRunnable)
+        if (nativeDigitBuffer.isBlank()) return
+        nativeDigitBuffer = ""
+        renderNativeTuneBuffer()
     }
 
     private fun tintModeButton(button: Button, active: Boolean) {
@@ -562,18 +635,92 @@ class MainActivity : AppCompatActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (nativeJioPanelVisible && keyCode == KeyEvent.KEYCODE_BACK) {
             nativeJioPanelVisible = false
+            clearNativeDigitBuffer()
             renderNativeWatchState(latestNativeWatchState)
             return true
         }
         if (nativeChannelBrowserVisible && keyCode == KeyEvent.KEYCODE_BACK) {
             nativeChannelBrowserVisible = false
+            clearNativeDigitBuffer()
             renderNativeWatchState(latestNativeWatchState)
+            return true
+        }
+        if (nativeDigitBuffer.isNotBlank() && keyCode == KeyEvent.KEYCODE_BACK) {
+            clearNativeDigitBuffer()
             return true
         }
         if (ENABLE_NATIVE_WATCH_PANEL && latestNativeWatchState.isMenuVisible) {
             if (keyCode == KeyEvent.KEYCODE_BACK) {
                 dispatchWatchCommand("window.AndroidWatchClient?.hideMenu?.();")
                 return true
+            }
+        }
+
+        val focusedInput = currentFocus as? EditText
+        if (focusedInput != null) {
+            return super.onKeyDown(keyCode, event)
+        }
+
+        val menuPanelsOpen = nativeChannelBrowserVisible || nativeJioPanelVisible
+
+        when (keyCode) {
+            KeyEvent.KEYCODE_0,
+            KeyEvent.KEYCODE_1,
+            KeyEvent.KEYCODE_2,
+            KeyEvent.KEYCODE_3,
+            KeyEvent.KEYCODE_4,
+            KeyEvent.KEYCODE_5,
+            KeyEvent.KEYCODE_6,
+            KeyEvent.KEYCODE_7,
+            KeyEvent.KEYCODE_8,
+            KeyEvent.KEYCODE_9,
+            -> {
+                if (!menuPanelsOpen) {
+                    appendNativeDigit(keyCode - KeyEvent.KEYCODE_0)
+                    return true
+                }
+            }
+
+            KeyEvent.KEYCODE_CHANNEL_UP,
+            KeyEvent.KEYCODE_MEDIA_NEXT,
+            -> {
+                handleNativeChannelDelta(1)
+                return true
+            }
+
+            KeyEvent.KEYCODE_CHANNEL_DOWN,
+            KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+            -> {
+                handleNativeChannelDelta(-1)
+                return true
+            }
+
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                if (!menuPanelsOpen && !latestNativeWatchState.isMenuVisible) {
+                    handleNativeChannelDelta(1)
+                    return true
+                }
+            }
+
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                if (!menuPanelsOpen && !latestNativeWatchState.isMenuVisible) {
+                    handleNativeChannelDelta(-1)
+                    return true
+                }
+            }
+
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_MENU,
+            -> {
+                if (!menuPanelsOpen) {
+                    if (nativeDigitBuffer.isNotBlank()) {
+                        commitNativeDigitBuffer()
+                    } else {
+                        dispatchWatchCommand("window.AndroidWatchClient?.toggleMenu?.();")
+                    }
+                    return true
+                }
             }
         }
 
@@ -597,6 +744,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         DebugLogStore.add("MainActivity", "App destroyed")
+        nativeDigitHandler.removeCallbacksAndMessages(null)
         nativeWatchViewModel.clear()
         nativePlayerController.close()
         with(binding.webView) {

@@ -41,4 +41,46 @@ class NativeWatchViewModel : ViewModel() {
     fun clear() {
         _uiState.value = NativeWatchUiState()
     }
+
+    fun previewChannelSelection(channelId: String) {
+        if (channelId.isBlank()) return
+
+        _uiState.update { current ->
+            val targetChannel = current.channels.firstOrNull { it.id == channelId } ?: return@update current
+            val updatedChannels =
+                current.channels.map { item ->
+                    item.copy(isSelected = item.id == targetChannel.id)
+                }
+            val channelName = targetChannel.name.ifBlank { "Live TV" }
+
+            current.copy(
+                channel =
+                    NativeWatchChannel(
+                        id = targetChannel.id,
+                        name = channelName,
+                        logoUrl = targetChannel.logoUrl,
+                        playbackMode = targetChannel.playbackMode,
+                        isDirectStream = targetChannel.isDirectStream,
+                    ),
+                channels = updatedChannels,
+                loading =
+                    NativeWatchLoadingState(
+                        visible = true,
+                        label = "Loading $channelName",
+                        progress = current.loading.progress.coerceAtLeast(8),
+                        programTitle = "Programme info unavailable",
+                        programSubtitle = channelName,
+                    ),
+                epg =
+                    listOf(
+                        NativeWatchProgram(
+                            title = "No info",
+                            subtitle = "Programme info unavailable",
+                            isPlaceholder = true,
+                            isCurrent = true,
+                        ),
+                    ),
+            )
+        }
+    }
 }
