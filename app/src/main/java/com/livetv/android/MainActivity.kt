@@ -67,6 +67,7 @@ class MainActivity : AppCompatActivity() {
     private var activeNetworkTransport = "unknown"
     private var pendingNetworkReloadReason = ""
     private var autoLaunchOnBootEnabled = false
+    @Volatile private var lastKnownWebViewUrl = ""
     private val directStreamInterceptor = DirectStreamInterceptor(TARGET_HOST)
 
     private enum class NativeJioPanelMode {
@@ -103,7 +104,7 @@ class MainActivity : AppCompatActivity() {
                 runCatching { connectivityManager.bindProcessToNetwork(network) }
                 DebugLogStore.add("Network", "Using $transport network")
 
-                val webViewUrl = binding.webView.url.orEmpty()
+                val webViewUrl = lastKnownWebViewUrl
                 val shouldRecover =
                     lastMainFrameLoadFailed ||
                         webViewUrl.isBlank() ||
@@ -791,6 +792,7 @@ class MainActivity : AppCompatActivity() {
             DebugLogStore.add("Network", "Reloading WebView after $reason")
             val currentUrl = binding.webView.url.orEmpty()
             if (currentUrl.isBlank() || currentUrl == "about:blank") {
+                lastKnownWebViewUrl = TARGET_URL
                 binding.webView.loadUrl(TARGET_URL)
             } else {
                 binding.webView.reload()
@@ -892,6 +894,7 @@ class MainActivity : AppCompatActivity() {
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                     super.onPageStarted(view, url, favicon)
                     lastMainFrameLoadFailed = false
+                    lastKnownWebViewUrl = url.orEmpty()
                     DebugLogStore.add("WebView", "Page started ${url ?: "unknown"}")
                     view?.evaluateJavascript(
                         """
@@ -912,6 +915,7 @@ class MainActivity : AppCompatActivity() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     lastMainFrameLoadFailed = false
+                    lastKnownWebViewUrl = url.orEmpty()
                     DebugLogStore.add("WebView", "Page finished ${url ?: "unknown"}")
                     view?.let { injectAndroidTvShell(it) }
                 }
@@ -953,6 +957,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             DebugLogStore.add("WebView", "Loading $TARGET_URL")
+            lastKnownWebViewUrl = TARGET_URL
             loadUrl(TARGET_URL)
         }
     }
@@ -1126,6 +1131,7 @@ class MainActivity : AppCompatActivity() {
             clearHistory()
             clearCache(false)
             webChromeClient = null
+            lastKnownWebViewUrl = "about:blank"
             loadUrl("about:blank")
             destroy()
         }
