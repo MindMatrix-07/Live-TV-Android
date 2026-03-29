@@ -481,7 +481,7 @@ class MainActivity : AppCompatActivity() {
                 body.android-tv-shell .channel-loading-brand {
                   top: max(env(safe-area-inset-top, 0px), calc(28px * var(--android-tv-scale))) !important;
                   left: calc(28px * var(--android-tv-scale)) !important;
-                  width: min(22vw, calc(180px * var(--android-tv-scale))) !important;
+                  width: min(28vw, calc(260px * var(--android-tv-scale))) !important;
                 }
 
                 body.android-tv-shell .channel-loading-stage {

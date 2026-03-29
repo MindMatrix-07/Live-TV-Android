@@ -41,11 +41,11 @@
 
             <ImageView
                 android:id="@+id/nativeLoadingBrandImage"
-                android:layout_width="210dp"
-                android:layout_height="72dp"
+                android:layout_width="320dp"
+                android:layout_height="110dp"
                 android:layout_gravity="start|top"
-                android:layout_marginStart="18dp"
-                android:layout_marginTop="18dp"
+                android:layout_marginStart="20dp"
+                android:layout_marginTop="20dp"
                 android:src="@drawable/app_brand"
                 android:scaleType="fitStart" />
 
