@@ -290,35 +290,44 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 body.android-tv-shell .channel-loading-card {
-                  width: min(76vw, calc(380px * var(--android-tv-scale))) !important;
-                  padding: calc(9px * var(--android-tv-scale))
-                           calc(11px * var(--android-tv-scale))
-                           calc(10px * var(--android-tv-scale)) !important;
-                  border-radius: calc(14px * var(--android-tv-scale)) !important;
+                  width: min(54vw, calc(360px * var(--android-tv-scale))) !important;
+                  gap: calc(12px * var(--android-tv-scale)) !important;
                 }
 
                 body.android-tv-shell .channel-loading-overlay {
-                  top: max(env(safe-area-inset-top, 0px), calc(10px * var(--android-tv-scale))) !important;
-                  left: 50% !important;
-                  transform: translateX(-50%) !important;
-                  inset: auto !important;
-                  width: min(82vw, calc(420px * var(--android-tv-scale))) !important;
+                  inset: 0 !important;
                 }
 
-                body.android-tv-shell .channel-loading-meta {
-                  gap: calc(8px * var(--android-tv-scale)) !important;
+                body.android-tv-shell .channel-loading-brand {
+                  top: max(env(safe-area-inset-top, 0px), calc(28px * var(--android-tv-scale))) !important;
+                  left: calc(28px * var(--android-tv-scale)) !important;
+                  width: min(22vw, calc(180px * var(--android-tv-scale))) !important;
                 }
 
-                body.android-tv-shell .channel-loading-label {
-                  font-size: clamp(0.7rem, calc(0.76rem * var(--android-tv-scale)), 0.88rem) !important;
+                body.android-tv-shell .channel-loading-stage {
+                  min-height: calc(132px * var(--android-tv-scale)) !important;
+                }
+
+                body.android-tv-shell .channel-loading-logo {
+                  width: min(100%, calc(220px * var(--android-tv-scale))) !important;
+                  max-height: calc(136px * var(--android-tv-scale)) !important;
+                }
+
+                body.android-tv-shell .channel-loading-fallback {
+                  font-size: clamp(1.6rem, calc(1.9rem * var(--android-tv-scale)), 2.1rem) !important;
                 }
 
                 body.android-tv-shell .channel-loading-bar {
-                  height: calc(6px * var(--android-tv-scale)) !important;
+                  width: min(100%, calc(220px * var(--android-tv-scale))) !important;
+                  height: calc(4px * var(--android-tv-scale)) !important;
                 }
 
-                body.android-tv-shell .channel-loading-percent {
-                  font-size: clamp(0.54rem, calc(0.6rem * var(--android-tv-scale)), 0.7rem) !important;
+                body.android-tv-shell .channel-loading-copy {
+                  font-size: clamp(0.88rem, calc(1rem * var(--android-tv-scale)), 1.08rem) !important;
+                }
+
+                body.android-tv-shell .channel-loading-subcopy {
+                  font-size: clamp(0.56rem, calc(0.62rem * var(--android-tv-scale)), 0.72rem) !important;
                 }
 
                 body.android-tv-shell .epg-list {
