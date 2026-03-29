@@ -17,8 +17,17 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.core.view.isVisible
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.LinearLayoutManager
+import coil.load
+import kotlinx.coroutines.flow.collectLatest
 import com.livetv.android.databinding.ActivityMainBinding
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
@@ -26,6 +35,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var androidLogsBridge: AndroidLogsBridge
     private lateinit var nativePlayerController: NativeDirectPlayerController
     private lateinit var androidNativePlayerBridge: AndroidNativePlayerBridge
+    private lateinit var nativeWatchViewModel: NativeWatchViewModel
+    private lateinit var androidWatchBridge: AndroidWatchBridge
+    private lateinit var nativeWatchProgramAdapter: NativeWatchProgramAdapter
     private val directStreamInterceptor = DirectStreamInterceptor(TARGET_HOST)
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -38,9 +50,93 @@ class MainActivity : AppCompatActivity() {
         androidLogsBridge = AndroidLogsBridge(this)
         nativePlayerController = NativeDirectPlayerController(this, binding.nativePlayerView)
         androidNativePlayerBridge = AndroidNativePlayerBridge(nativePlayerController)
+        nativeWatchViewModel = ViewModelProvider(this)[NativeWatchViewModel::class.java]
+        androidWatchBridge = AndroidWatchBridge(nativeWatchViewModel)
+        nativeWatchProgramAdapter = NativeWatchProgramAdapter()
         DebugLogStore.add("MainActivity", "App created")
 
+        setupNativeWatchOverlay()
+        observeNativeWatchState()
         setupWebView()
+    }
+
+    private fun setupNativeWatchOverlay() {
+        binding.nativeWatchEpgList.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = nativeWatchProgramAdapter
+            itemAnimator = null
+        }
+    }
+
+    private fun observeNativeWatchState() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                nativeWatchViewModel.uiState.collectLatest(::renderNativeWatchState)
+            }
+        }
+    }
+
+    private fun renderNativeWatchState(state: NativeWatchUiState) {
+        renderNativeLoading(state)
+        renderNativeWatchPanel(state)
+    }
+
+    private fun renderNativeLoading(state: NativeWatchUiState) {
+        val loadingVisible = state.loading.visible
+        binding.nativeLoadingContainer.isVisible = loadingVisible
+
+        if (!loadingVisible) {
+            binding.nativeLoadingChannelLogo.isVisible = false
+            binding.nativeLoadingFallbackName.isVisible = false
+            binding.nativeLoadingProgress.progress = 0
+            binding.nativeLoadingSubtext.text = ""
+            return
+        }
+
+        val fallbackName = state.channel?.name?.takeIf { it.isNotBlank() } ?: "Loading channel"
+        val logoUrl = state.channel?.logoUrl
+
+        binding.nativeLoadingProgress.progress = state.loading.progress.coerceIn(0, 100)
+        binding.nativeLoadingText.text = state.loading.label.ifBlank { "Loading..." }
+        binding.nativeLoadingSubtext.text = fallbackName
+        binding.nativeLoadingFallbackName.text = fallbackName
+
+        if (logoUrl.isNullOrBlank()) {
+            binding.nativeLoadingChannelLogo.setImageDrawable(null)
+            binding.nativeLoadingChannelLogo.isVisible = false
+            binding.nativeLoadingFallbackName.isVisible = true
+            return
+        }
+
+        binding.nativeLoadingChannelLogo.isVisible = true
+        binding.nativeLoadingFallbackName.isVisible = false
+        binding.nativeLoadingChannelLogo.load(logoUrl) {
+            crossfade(true)
+            listener(
+                onError = { _, _ ->
+                    binding.nativeLoadingChannelLogo.isVisible = false
+                    binding.nativeLoadingFallbackName.isVisible = true
+                },
+            )
+        }
+    }
+
+    private fun renderNativeWatchPanel(state: NativeWatchUiState) {
+        val shouldShowPanel = ENABLE_NATIVE_WATCH_PANEL && state.isMenuVisible && !state.loading.visible
+        binding.nativeWatchPanel.isVisible = shouldShowPanel
+        if (!shouldShowPanel) return
+
+        val channelName = state.channel?.name?.takeIf { it.isNotBlank() } ?: "Live TV"
+        val playbackLabel = state.channel?.playbackMode?.takeIf { it.isNotBlank() } ?: "Live"
+        binding.nativeWatchTitle.text = channelName
+        binding.nativeWatchMeta.text =
+            buildString {
+                append("CH ")
+                append(state.channel?.id?.ifBlank { "--" } ?: "--")
+                append(" • ")
+                append(playbackLabel.uppercase())
+            }
+        nativeWatchProgramAdapter.submitList(state.epg)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -85,6 +181,7 @@ class MainActivity : AppCompatActivity() {
             setInitialScale(100)
             addJavascriptInterface(androidLogsBridge, "AndroidLogs")
             addJavascriptInterface(androidNativePlayerBridge, "AndroidNativePlayer")
+            addJavascriptInterface(androidWatchBridge, "AndroidWatch")
             webChromeClient = object : WebChromeClient() {
                 override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
                     val source = consoleMessage.sourceId()?.substringAfterLast('/') ?: "inline"
@@ -187,6 +284,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         DebugLogStore.add("MainActivity", "App destroyed")
+        nativeWatchViewModel.clear()
         nativePlayerController.close()
         with(binding.webView) {
             stopLoading()
@@ -202,6 +300,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val TARGET_URL = "https://jiolivetv.vercel.app"
         private const val TARGET_HOST = "jiolivetv.vercel.app"
+        private const val ENABLE_NATIVE_WATCH_PANEL = false
         private const val DIRECT_STREAM_USER_AGENT =
             "Mozilla/5.0 (Linux; Android 13; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
     }
