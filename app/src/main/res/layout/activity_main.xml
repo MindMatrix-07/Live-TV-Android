@@ -41,8 +41,8 @@
 
             <ImageView
                 android:id="@+id/nativeLoadingBrandImage"
-                android:layout_width="320dp"
-                android:layout_height="110dp"
+                android:layout_width="236dp"
+                android:layout_height="82dp"
                 android:layout_gravity="start|top"
                 android:layout_marginStart="20dp"
                 android:layout_marginTop="20dp"
@@ -158,6 +158,40 @@
                 android:nestedScrollingEnabled="false" />
 
             <LinearLayout
+                android:id="@+id/nativeWatchActionRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/nativeOpenChannelsButton"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#18FFFFFF"
+                    android:minHeight="40dp"
+                    android:text="Channels"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/nativeOpenJioButton"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#1EFFFFFF"
+                    android:minHeight="40dp"
+                    android:text="Jio"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:id="@+id/nativeWatchAudioSection"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -247,6 +281,341 @@
                 android:textColor="#82FFFFFF"
                 android:textSize="9sp"
                 android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/nativeChannelBrowserPanel"
+            android:layout_width="340dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|start"
+            android:layout_marginStart="372dp"
+            android:layout_marginBottom="24dp"
+            android:background="#E1111111"
+            android:clickable="true"
+            android:focusable="true"
+            android:orientation="vertical"
+            android:padding="14dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/nativeChannelBrowserTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Channels"
+                    android:textColor="@android:color/white"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/nativeCloseChannelBrowserButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:backgroundTint="#18FFFFFF"
+                    android:minHeight="36dp"
+                    android:text="Close"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/nativeChannelBrowserMeta"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Browse and switch channels natively"
+                android:textColor="#99FFFFFF"
+                android:textSize="10sp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/nativeChannelBrowserList"
+                android:layout_width="match_parent"
+                android:layout_height="320dp"
+                android:layout_marginTop="12dp"
+                android:nestedScrollingEnabled="false" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/nativeJioPanel"
+            android:layout_width="420dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:background="#F0111111"
+            android:clickable="true"
+            android:focusable="true"
+            android:orientation="vertical"
+            android:padding="18dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/nativeJioTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Jio Settings"
+                    android:textColor="@android:color/white"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/nativeCloseJioButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:backgroundTint="#18FFFFFF"
+                    android:minHeight="36dp"
+                    android:text="Close"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/nativeJioStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="#CCFFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/nativeJioMessage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="#99FFFFFF"
+                android:textSize="11sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/nativeJioOtpModeButton"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#18FFFFFF"
+                    android:minHeight="38dp"
+                    android:text="OTP"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="10sp" />
+
+                <Button
+                    android:id="@+id/nativeJioImportModeButton"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#18FFFFFF"
+                    android:minHeight="38dp"
+                    android:text="Import"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="10sp" />
+
+                <Button
+                    android:id="@+id/nativeJioSearchModeButton"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#18FFFFFF"
+                    android:minHeight="38dp"
+                    android:text="Search"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/nativeJioOtpSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="vertical">
+
+                <EditText
+                    android:id="@+id/nativeJioPhoneInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="#16FFFFFF"
+                    android:hint="Jio phone number"
+                    android:imeOptions="actionNext"
+                    android:inputType="phone"
+                    android:minHeight="48dp"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="10dp"
+                    android:textColor="@android:color/white"
+                    android:textColorHint="#77FFFFFF" />
+
+                <EditText
+                    android:id="@+id/nativeJioOtpInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="#16FFFFFF"
+                    android:hint="OTP"
+                    android:inputType="number"
+                    android:minHeight="48dp"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="10dp"
+                    android:textColor="@android:color/white"
+                    android:textColorHint="#77FFFFFF" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/nativeJioSendOtpButton"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:backgroundTint="#18FFFFFF"
+                        android:minHeight="40dp"
+                        android:text="Send OTP"
+                        android:textAllCaps="false"
+                        android:textColor="@android:color/white"
+                        android:textSize="11sp" />
+
+                    <Button
+                        android:id="@+id/nativeJioVerifyOtpButton"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:backgroundTint="#22FFFFFF"
+                        android:minHeight="40dp"
+                        android:text="Verify OTP"
+                        android:textAllCaps="false"
+                        android:textColor="@android:color/white"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/nativeJioImportSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <EditText
+                    android:id="@+id/nativeJioImportPhoneInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="#16FFFFFF"
+                    android:hint="Jio phone number (optional)"
+                    android:inputType="phone"
+                    android:minHeight="48dp"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="10dp"
+                    android:textColor="@android:color/white"
+                    android:textColorHint="#77FFFFFF" />
+
+                <EditText
+                    android:id="@+id/nativeJioImportPayloadInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="160dp"
+                    android:layout_marginTop="8dp"
+                    android:background="#16FFFFFF"
+                    android:gravity="top|start"
+                    android:hint="Paste session JSON"
+                    android:inputType="textMultiLine"
+                    android:padding="12dp"
+                    android:textColor="@android:color/white"
+                    android:textColorHint="#77FFFFFF" />
+
+                <Button
+                    android:id="@+id/nativeJioImportButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:layout_marginTop="10dp"
+                    android:backgroundTint="#22FFFFFF"
+                    android:minHeight="40dp"
+                    android:text="Import Session"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/nativeJioSearchSection"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="14dp"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/nativeJioSearchInput"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="#16FFFFFF"
+                        android:hint="Search Jio channels"
+                        android:imeOptions="actionSearch"
+                        android:minHeight="44dp"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="10dp"
+                        android:textColor="@android:color/white"
+                        android:textColorHint="#77FFFFFF" />
+
+                    <Button
+                        android:id="@+id/nativeJioRefreshButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:layout_marginStart="8dp"
+                        android:backgroundTint="#18FFFFFF"
+                        android:minHeight="40dp"
+                        android:text="Refresh"
+                        android:textAllCaps="false"
+                        android:textColor="@android:color/white"
+                        android:textSize="10sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/nativeJioCatalogSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="#99FFFFFF"
+                    android:textSize="10sp" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/nativeJioCatalogList"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_marginTop="10dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
         </LinearLayout>
 
     </FrameLayout>

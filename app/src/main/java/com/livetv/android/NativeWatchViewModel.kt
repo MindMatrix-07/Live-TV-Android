@@ -12,6 +12,7 @@ class NativeWatchViewModel : ViewModel() {
 
     fun syncFromWeb(
         channel: NativeWatchChannel?,
+        channels: List<NativeWatchChannelListItem>,
         loading: NativeWatchLoadingState,
         epg: List<NativeWatchProgram>,
         audioTracks: List<NativeWatchAudioTrack>,
@@ -19,10 +20,12 @@ class NativeWatchViewModel : ViewModel() {
         nextChannelName: String,
         isMenuVisible: Boolean,
         isNativePlayerActive: Boolean,
+        jio: NativeWatchJioState,
     ) {
         _uiState.update {
             NativeWatchUiState(
                 channel = channel,
+                channels = channels,
                 loading = loading.copy(progress = loading.progress.coerceIn(0, 100)),
                 epg = epg,
                 audioTracks = audioTracks,
@@ -30,6 +33,7 @@ class NativeWatchViewModel : ViewModel() {
                 nextChannelName = nextChannelName,
                 isMenuVisible = isMenuVisible,
                 isNativePlayerActive = isNativePlayerActive,
+                jio = jio,
             )
         }
     }

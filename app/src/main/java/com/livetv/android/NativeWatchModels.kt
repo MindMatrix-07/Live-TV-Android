@@ -8,6 +8,15 @@ data class NativeWatchChannel(
     val isDirectStream: Boolean = false,
 )
 
+data class NativeWatchChannelListItem(
+    val id: String = "",
+    val name: String = "",
+    val logoUrl: String? = null,
+    val playbackMode: String = "",
+    val isDirectStream: Boolean = false,
+    val isSelected: Boolean = false,
+)
+
 data class NativeWatchProgram(
     val title: String,
     val subtitle: String,
@@ -30,8 +39,30 @@ data class NativeWatchLoadingState(
     val programSubtitle: String = "",
 )
 
+data class NativeWatchJioCatalogItem(
+    val channelId: String = "",
+    val channelName: String = "",
+    val categoryName: String = "",
+    val logoUrl: String? = null,
+    val imported: Boolean = false,
+)
+
+data class NativeWatchJioState(
+    val authenticated: Boolean = false,
+    val loading: Boolean = false,
+    val submitting: Boolean = false,
+    val userIdentifier: String = "",
+    val error: String = "",
+    val message: String = "",
+    val catalogLoading: Boolean = false,
+    val catalogError: String = "",
+    val otpStage: String = "send",
+    val channels: List<NativeWatchJioCatalogItem> = emptyList(),
+)
+
 data class NativeWatchUiState(
     val channel: NativeWatchChannel? = null,
+    val channels: List<NativeWatchChannelListItem> = emptyList(),
     val loading: NativeWatchLoadingState = NativeWatchLoadingState(),
     val epg: List<NativeWatchProgram> = emptyList(),
     val audioTracks: List<NativeWatchAudioTrack> = emptyList(),
@@ -39,4 +70,5 @@ data class NativeWatchUiState(
     val nextChannelName: String = "",
     val isMenuVisible: Boolean = false,
     val isNativePlayerActive: Boolean = false,
+    val jio: NativeWatchJioState = NativeWatchJioState(),
 )

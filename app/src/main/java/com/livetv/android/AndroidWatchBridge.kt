@@ -26,6 +26,7 @@ class AndroidWatchBridge(
 
             watchViewModel.syncFromWeb(
                 channel = channelObject?.toNativeWatchChannel(),
+                channels = payload.optJSONArray("channels").toNativeWatchChannels(),
                 loading = loadingObject.toNativeWatchLoadingState(),
                 epg = epgArray.toNativeWatchPrograms(),
                 audioTracks = payload.optJSONArray("audioTracks").toNativeWatchAudioTracks(),
@@ -33,6 +34,7 @@ class AndroidWatchBridge(
                 nextChannelName = payload.optString("nextChannelName"),
                 isMenuVisible = payload.optBoolean("menuVisible", false),
                 isNativePlayerActive = payload.optBoolean("nativePlayerActive", false),
+                jio = payload.optJSONObject("jio").toNativeWatchJioState(),
             )
         }.onFailure { error ->
             DebugLogStore.add("AndroidWatchBridge", "syncState failed", error)
@@ -77,6 +79,25 @@ class AndroidWatchBridge(
         }
     }
 
+    private fun JSONArray?.toNativeWatchChannels(): List<NativeWatchChannelListItem> {
+        if (this == null) return emptyList()
+        return buildList {
+            for (index in 0 until length()) {
+                val item = optJSONObject(index) ?: continue
+                add(
+                    NativeWatchChannelListItem(
+                        id = item.optString("id"),
+                        name = item.optString("name"),
+                        logoUrl = item.optString("logoUrl").takeIf { it.isNotBlank() },
+                        playbackMode = item.optString("playbackMode"),
+                        isDirectStream = item.optBoolean("isDirectStream", false),
+                        isSelected = item.optBoolean("selected", false),
+                    ),
+                )
+            }
+        }
+    }
+
     private fun JSONArray?.toNativeWatchAudioTracks(): List<NativeWatchAudioTrack> {
         if (this == null) return emptyList()
         return buildList {
@@ -90,6 +111,40 @@ class AndroidWatchBridge(
                         label = item.optString("label").ifBlank { "Track ${index + 1}" },
                         shortLabel = item.optString("shortLabel").ifBlank { item.optString("label").ifBlank { "Track ${index + 1}" } },
                         selected = item.optBoolean("selected", false),
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun JSONObject?.toNativeWatchJioState(): NativeWatchJioState {
+        if (this == null) return NativeWatchJioState()
+        return NativeWatchJioState(
+            authenticated = optBoolean("authenticated", false),
+            loading = optBoolean("loading", false),
+            submitting = optBoolean("submitting", false),
+            userIdentifier = optString("userIdentifier"),
+            error = optString("error"),
+            message = optString("message"),
+            catalogLoading = optBoolean("catalogLoading", false),
+            catalogError = optString("catalogError"),
+            otpStage = optString("otpStage").ifBlank { "send" },
+            channels = optJSONArray("channels").toNativeWatchJioCatalogItems(),
+        )
+    }
+
+    private fun JSONArray?.toNativeWatchJioCatalogItems(): List<NativeWatchJioCatalogItem> {
+        if (this == null) return emptyList()
+        return buildList {
+            for (index in 0 until length()) {
+                val item = optJSONObject(index) ?: continue
+                add(
+                    NativeWatchJioCatalogItem(
+                        channelId = item.optString("channelId"),
+                        channelName = item.optString("channelName"),
+                        categoryName = item.optString("categoryName"),
+                        logoUrl = item.optString("logoUrl").takeIf { it.isNotBlank() },
+                        imported = item.optBoolean("imported", false),
                     ),
                 )
             }

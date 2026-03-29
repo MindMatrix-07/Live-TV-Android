@@ -8,6 +8,8 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.Button
+import android.widget.EditText
 import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
@@ -18,6 +20,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.view.isVisible
+import androidx.core.widget.doAfterTextChanged
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
@@ -40,8 +43,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var androidWatchBridge: AndroidWatchBridge
     private lateinit var nativeWatchProgramAdapter: NativeWatchProgramAdapter
     private lateinit var nativeWatchAudioTrackAdapter: NativeWatchAudioTrackAdapter
+    private lateinit var nativeChannelBrowserAdapter: NativeChannelBrowserAdapter
+    private lateinit var nativeJioCatalogAdapter: NativeJioCatalogAdapter
     private var latestNativeWatchState: NativeWatchUiState = NativeWatchUiState()
+    private var nativeChannelBrowserVisible = false
+    private var nativeJioPanelVisible = false
+    private var nativeJioPanelMode = NativeJioPanelMode.OTP
+    private var nativeJioSearchQuery = ""
     private val directStreamInterceptor = DirectStreamInterceptor(TARGET_HOST)
+
+    private enum class NativeJioPanelMode {
+        OTP,
+        IMPORT,
+        SEARCH,
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,6 +73,18 @@ class MainActivity : AppCompatActivity() {
         nativeWatchProgramAdapter = NativeWatchProgramAdapter()
         nativeWatchAudioTrackAdapter = NativeWatchAudioTrackAdapter { track ->
             dispatchWatchCommand("window.AndroidWatchClient?.selectAudioTrack?.(${JSONObject.quote(track.id)});")
+        }
+        nativeChannelBrowserAdapter = NativeChannelBrowserAdapter { channelItem ->
+            nativeChannelBrowserVisible = false
+            renderNativeWatchState(latestNativeWatchState)
+            dispatchWatchCommand("window.AndroidWatchClient?.selectChannel?.(${JSONObject.quote(channelItem.id)});")
+        }
+        nativeJioCatalogAdapter = NativeJioCatalogAdapter { channelItem ->
+            if (channelItem.imported) {
+                dispatchWatchCommand("window.AndroidWatchClient?.removeJioChannel?.(${JSONObject.quote(channelItem.channelId)});")
+            } else {
+                dispatchWatchCommand("window.AndroidWatchClient?.importJioChannel?.(${JSONObject.quote(channelItem.channelId)});")
+            }
         }
         DebugLogStore.add("MainActivity", "App created")
 
@@ -79,6 +106,18 @@ class MainActivity : AppCompatActivity() {
             itemAnimator = null
         }
 
+        binding.nativeChannelBrowserList.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = nativeChannelBrowserAdapter
+            itemAnimator = null
+        }
+
+        binding.nativeJioCatalogList.apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
+            adapter = nativeJioCatalogAdapter
+            itemAnimator = null
+        }
+
         binding.nativePreviousButton.setOnClickListener {
             dispatchWatchCommand("window.AndroidWatchClient?.previousChannel?.();")
         }
@@ -87,6 +126,81 @@ class MainActivity : AppCompatActivity() {
         }
         binding.nativeFullscreenButton.setOnClickListener {
             dispatchWatchCommand("window.AndroidWatchClient?.toggleFullscreen?.();")
+        }
+
+        binding.nativeOpenChannelsButton.setOnClickListener {
+            nativeChannelBrowserVisible = !nativeChannelBrowserVisible
+            if (nativeChannelBrowserVisible) {
+                nativeJioPanelVisible = false
+                dispatchWatchCommand("window.AndroidWatchClient?.showMenu?.();")
+            }
+            renderNativeWatchState(latestNativeWatchState)
+        }
+        binding.nativeCloseChannelBrowserButton.setOnClickListener {
+            nativeChannelBrowserVisible = false
+            renderNativeWatchState(latestNativeWatchState)
+        }
+        binding.nativeOpenJioButton.setOnClickListener {
+            nativeJioPanelVisible = !nativeJioPanelVisible
+            if (nativeJioPanelVisible) {
+                nativeChannelBrowserVisible = false
+                nativeJioPanelMode =
+                    if (latestNativeWatchState.jio.authenticated) {
+                        NativeJioPanelMode.SEARCH
+                    } else {
+                        NativeJioPanelMode.OTP
+                    }
+                dispatchWatchCommand("window.AndroidWatchClient?.showMenu?.();")
+                if (latestNativeWatchState.jio.channels.isEmpty() && !latestNativeWatchState.jio.catalogLoading) {
+                    dispatchWatchCommand("window.AndroidWatchClient?.refreshJioCatalog?.();")
+                }
+            }
+            renderNativeWatchState(latestNativeWatchState)
+        }
+        binding.nativeCloseJioButton.setOnClickListener {
+            nativeJioPanelVisible = false
+            renderNativeWatchState(latestNativeWatchState)
+        }
+
+        binding.nativeJioOtpModeButton.setOnClickListener {
+            nativeJioPanelMode = NativeJioPanelMode.OTP
+            renderNativeJioPanel(latestNativeWatchState)
+        }
+        binding.nativeJioImportModeButton.setOnClickListener {
+            nativeJioPanelMode = NativeJioPanelMode.IMPORT
+            renderNativeJioPanel(latestNativeWatchState)
+        }
+        binding.nativeJioSearchModeButton.setOnClickListener {
+            nativeJioPanelMode = NativeJioPanelMode.SEARCH
+            if (latestNativeWatchState.jio.channels.isEmpty() && !latestNativeWatchState.jio.catalogLoading) {
+                dispatchWatchCommand("window.AndroidWatchClient?.refreshJioCatalog?.();")
+            }
+            renderNativeJioPanel(latestNativeWatchState)
+        }
+
+        binding.nativeJioSendOtpButton.setOnClickListener {
+            dispatchWatchCommand(
+                "window.AndroidWatchClient?.sendJioOtp?.(${JSONObject.quote(binding.nativeJioPhoneInput.text?.toString().orEmpty())});",
+            )
+        }
+        binding.nativeJioVerifyOtpButton.setOnClickListener {
+            dispatchWatchCommand(
+                "window.AndroidWatchClient?.verifyJioOtp?.(${JSONObject.quote(binding.nativeJioPhoneInput.text?.toString().orEmpty())}, ${JSONObject.quote(binding.nativeJioOtpInput.text?.toString().orEmpty())});",
+            )
+        }
+        binding.nativeJioImportButton.setOnClickListener {
+            dispatchWatchCommand(
+                "window.AndroidWatchClient?.importJioSession?.(${JSONObject.quote(binding.nativeJioImportPayloadInput.text?.toString().orEmpty())}, ${JSONObject.quote(binding.nativeJioImportPhoneInput.text?.toString().orEmpty())});",
+            )
+        }
+        binding.nativeJioRefreshButton.setOnClickListener {
+            dispatchWatchCommand("window.AndroidWatchClient?.refreshJioCatalog?.();")
+            dispatchWatchCommand("window.AndroidWatchClient?.refreshJioSession?.();")
+        }
+
+        binding.nativeJioSearchInput.doAfterTextChanged { editable ->
+            nativeJioSearchQuery = editable?.toString().orEmpty()
+            renderNativeJioPanel(latestNativeWatchState)
         }
     }
 
@@ -100,8 +214,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderNativeWatchState(state: NativeWatchUiState) {
         latestNativeWatchState = state
+        if (state.loading.visible) {
+            nativeChannelBrowserVisible = false
+        }
         renderNativeLoading(state)
         renderNativeWatchPanel(state)
+        renderNativeChannelBrowser(state)
+        renderNativeJioPanel(state)
     }
 
     private fun renderNativeLoading(state: NativeWatchUiState) {
@@ -159,7 +278,7 @@ class MainActivity : AppCompatActivity() {
         val shouldShowPanel =
             ENABLE_NATIVE_WATCH_PANEL &&
                 state.channel != null &&
-                state.isMenuVisible &&
+                (state.isMenuVisible || nativeChannelBrowserVisible || nativeJioPanelVisible) &&
                 !state.loading.visible
         binding.nativeWatchPanel.isVisible = shouldShowPanel
         if (!shouldShowPanel) return
@@ -201,6 +320,109 @@ class MainActivity : AppCompatActivity() {
             } else {
                 "Next\n${state.nextChannelName}"
             }
+        binding.nativeOpenChannelsButton.text = "Channels (${state.channels.size})"
+        binding.nativeOpenJioButton.text =
+            when {
+                state.jio.loading -> "Jio..."
+                state.jio.authenticated -> "Jio Ready"
+                else -> "Jio Login"
+            }
+    }
+
+    private fun renderNativeChannelBrowser(state: NativeWatchUiState) {
+        val shouldShowBrowser =
+            nativeChannelBrowserVisible &&
+                state.channel != null &&
+                !state.loading.visible &&
+                state.channels.isNotEmpty()
+        binding.nativeChannelBrowserPanel.isVisible = shouldShowBrowser
+        if (!shouldShowBrowser) return
+
+        binding.nativeChannelBrowserMeta.text =
+            "${state.channels.size} channels • ${state.channel?.name?.ifBlank { "Live TV" } ?: "Live TV"} selected"
+        nativeChannelBrowserAdapter.submitList(state.channels)
+
+        val selectedIndex = state.channels.indexOfFirst { it.isSelected }
+        if (selectedIndex >= 0) {
+            binding.nativeChannelBrowserList.post {
+                binding.nativeChannelBrowserList.scrollToPosition(selectedIndex)
+                binding.nativeChannelBrowserList.findViewHolderForAdapterPosition(selectedIndex)?.itemView?.requestFocus()
+            }
+        }
+    }
+
+    private fun renderNativeJioPanel(state: NativeWatchUiState) {
+        binding.nativeJioPanel.isVisible = nativeJioPanelVisible
+        if (!nativeJioPanelVisible) return
+
+        tintModeButton(binding.nativeJioOtpModeButton, nativeJioPanelMode == NativeJioPanelMode.OTP)
+        tintModeButton(binding.nativeJioImportModeButton, nativeJioPanelMode == NativeJioPanelMode.IMPORT)
+        tintModeButton(binding.nativeJioSearchModeButton, nativeJioPanelMode == NativeJioPanelMode.SEARCH)
+
+        binding.nativeJioOtpSection.isVisible = nativeJioPanelMode == NativeJioPanelMode.OTP
+        binding.nativeJioImportSection.isVisible = nativeJioPanelMode == NativeJioPanelMode.IMPORT
+        binding.nativeJioSearchSection.isVisible = nativeJioPanelMode == NativeJioPanelMode.SEARCH
+
+        val statusText =
+            buildString {
+                append(if (state.jio.authenticated) "Session ready" else "Login required")
+                if (state.jio.userIdentifier.isNotBlank()) {
+                    append(" • ")
+                    append(state.jio.userIdentifier)
+                }
+            }
+        binding.nativeJioStatus.text = statusText
+        binding.nativeJioMessage.text =
+            when {
+                state.jio.catalogError.isNotBlank() -> state.jio.catalogError
+                state.jio.error.isNotBlank() -> state.jio.error
+                state.jio.message.isNotBlank() -> state.jio.message
+                state.jio.catalogLoading -> "Loading Jio channels..."
+                state.jio.loading -> "Checking Jio session..."
+                else -> "Manage Jio login, session import, and channel imports here."
+            }
+
+        if (!binding.nativeJioPhoneInput.isFocused) {
+            setEditTextValue(binding.nativeJioPhoneInput, state.jio.userIdentifier)
+        }
+        if (!binding.nativeJioImportPhoneInput.isFocused) {
+            setEditTextValue(binding.nativeJioImportPhoneInput, state.jio.userIdentifier)
+        }
+        binding.nativeJioOtpInput.isVisible = state.jio.otpStage == "verify"
+        binding.nativeJioSendOtpButton.text = if (state.jio.otpStage == "verify") "Resend OTP" else "Send OTP"
+        binding.nativeJioVerifyOtpButton.isEnabled = state.jio.otpStage == "verify"
+
+        val filteredCatalog =
+            if (nativeJioSearchQuery.isBlank()) {
+                state.jio.channels
+            } else {
+                val query = nativeJioSearchQuery.trim().lowercase()
+                state.jio.channels.filter { item ->
+                    item.channelName.lowercase().contains(query) ||
+                        item.channelId.contains(query) ||
+                        item.categoryName.lowercase().contains(query)
+                }
+            }
+
+        binding.nativeJioCatalogSummary.text =
+            if (state.jio.catalogLoading) {
+                "Loading Jio channels..."
+            } else {
+                "${filteredCatalog.size} shown • ${state.jio.channels.count { it.imported }} imported"
+            }
+        nativeJioCatalogAdapter.submitList(filteredCatalog)
+    }
+
+    private fun tintModeButton(button: Button, active: Boolean) {
+        button.setBackgroundColor(Color.parseColor(if (active) "#2AFFFFFF" else "#18FFFFFF"))
+        button.alpha = if (active) 1f else 0.82f
+    }
+
+    private fun setEditTextValue(editText: EditText, value: String) {
+        if (editText.text?.toString() != value) {
+            editText.setText(value)
+            editText.setSelection(editText.text?.length ?: 0)
+        }
     }
 
     private fun dispatchWatchCommand(script: String) {
@@ -338,6 +560,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (nativeJioPanelVisible && keyCode == KeyEvent.KEYCODE_BACK) {
+            nativeJioPanelVisible = false
+            renderNativeWatchState(latestNativeWatchState)
+            return true
+        }
+        if (nativeChannelBrowserVisible && keyCode == KeyEvent.KEYCODE_BACK) {
+            nativeChannelBrowserVisible = false
+            renderNativeWatchState(latestNativeWatchState)
+            return true
+        }
         if (ENABLE_NATIVE_WATCH_PANEL && latestNativeWatchState.isMenuVisible) {
             if (keyCode == KeyEvent.KEYCODE_BACK) {
                 dispatchWatchCommand("window.AndroidWatchClient?.hideMenu?.();")
@@ -481,7 +713,7 @@ class MainActivity : AppCompatActivity() {
                 body.android-tv-shell .channel-loading-brand {
                   top: max(env(safe-area-inset-top, 0px), calc(28px * var(--android-tv-scale))) !important;
                   left: calc(28px * var(--android-tv-scale)) !important;
-                  width: min(28vw, calc(260px * var(--android-tv-scale))) !important;
+                  width: min(24vw, calc(220px * var(--android-tv-scale))) !important;
                 }
 
                 body.android-tv-shell .channel-loading-stage {
