@@ -184,6 +184,8 @@ class NativeDirectPlayerController(
         return result.toString()
     }
 
+    fun isActive(): Boolean = player != null && playerView.visibility == View.VISIBLE
+
     fun selectAudioTrack(trackId: String): Boolean {
         val selector = trackSelector ?: return false
         val currentPlayer = player ?: return false
@@ -213,6 +215,7 @@ class NativeDirectPlayerController(
     }
 
     fun close() {
+        if (!isActive()) return
         release()
         DebugLogStore.add(TAG, "Closed native player")
     }

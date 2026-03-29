@@ -224,11 +224,46 @@ class MainActivity : AppCompatActivity() {
         if (state.loading.visible) {
             nativeChannelBrowserVisible = false
         }
+        syncNativePlayback(state)
         renderNativeLoading(state)
         renderNativeWatchPanel(state)
         renderNativeChannelBrowser(state)
         renderNativeJioPanel(state)
         renderNativeTuneBuffer()
+    }
+
+    private fun syncNativePlayback(state: NativeWatchUiState) {
+        val playbackTarget = state.playbackTarget
+        val target = playbackTarget
+            ?.takeIf {
+                it.manifestUrl.isNotBlank() &&
+                    it.streamType.lowercase() in setOf("hls", "dash")
+            }
+
+        if (target == null) {
+            if (nativePlayerController.isActive()) {
+                nativePlayerController.close()
+            }
+            setWebViewRenderingSuppressed(false)
+            return
+        }
+
+        val opened =
+            runCatching {
+                nativePlayerController.play(target.toPlayerConfigJson())
+            }.getOrElse { error ->
+                DebugLogStore.add("NativeWatch", "Native playback handoff failed", error)
+                false
+            }
+
+        setWebViewRenderingSuppressed(opened)
+    }
+
+    private fun setWebViewRenderingSuppressed(suppressed: Boolean) {
+        binding.webView.alpha = if (suppressed) 0.01f else 1f
+        binding.webView.isClickable = !suppressed
+        binding.webView.isFocusable = !suppressed
+        binding.webView.isFocusableInTouchMode = !suppressed
     }
 
     private fun renderNativeLoading(state: NativeWatchUiState) {
@@ -484,6 +519,24 @@ class MainActivity : AppCompatActivity() {
         if (nativeDigitBuffer.isBlank()) return
         nativeDigitBuffer = ""
         renderNativeTuneBuffer()
+    }
+
+    private fun NativeWatchPlaybackTarget.toPlayerConfigJson(): String {
+        val clearKeysJson = JSONObject()
+        clearKeys.forEach { (key, value) ->
+            clearKeysJson.put(key, value)
+        }
+
+        return JSONObject()
+            .put("channelId", channelId)
+            .put("channelName", channelName)
+            .put("manifestUrl", manifestUrl)
+            .put("streamType", streamType)
+            .put("authMode", authMode)
+            .put("referer", referer)
+            .put("userAgent", userAgent)
+            .put("clearKeys", if (clearKeysJson.length() > 0) clearKeysJson else JSONObject.NULL)
+            .toString()
     }
 
     private fun tintModeButton(button: Button, active: Boolean) {

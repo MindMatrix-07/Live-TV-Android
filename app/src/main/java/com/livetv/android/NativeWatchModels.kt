@@ -31,6 +31,19 @@ data class NativeWatchAudioTrack(
     val selected: Boolean = false,
 )
 
+data class NativeWatchPlaybackTarget(
+    val channelId: String = "",
+    val channelName: String = "",
+    val manifestUrl: String = "",
+    val streamType: String = "",
+    val authMode: String = "",
+    val referer: String = "",
+    val userAgent: String = "",
+    val clearKeys: Map<String, String> = emptyMap(),
+    val sourceUrl: String = "",
+    val isDirectStream: Boolean = false,
+)
+
 data class NativeWatchLoadingState(
     val visible: Boolean = false,
     val label: String = "",
@@ -66,6 +79,7 @@ data class NativeWatchUiState(
     val loading: NativeWatchLoadingState = NativeWatchLoadingState(),
     val epg: List<NativeWatchProgram> = emptyList(),
     val audioTracks: List<NativeWatchAudioTrack> = emptyList(),
+    val playbackTarget: NativeWatchPlaybackTarget? = null,
     val previousChannelName: String = "",
     val nextChannelName: String = "",
     val isMenuVisible: Boolean = false,

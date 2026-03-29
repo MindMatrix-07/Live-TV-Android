@@ -16,6 +16,9 @@ class AndroidNativePlayerBridge(
     fun isAvailable(): Boolean = true
 
     @JavascriptInterface
+    fun isPlayerActive(): Boolean = runCatching { playerController.isActive() }.getOrDefault(false)
+
+    @JavascriptInterface
     fun openPlayer(configJson: String): Boolean {
         val result = AtomicBoolean(false)
         val latch = CountDownLatch(1)

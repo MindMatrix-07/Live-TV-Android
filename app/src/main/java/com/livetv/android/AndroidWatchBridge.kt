@@ -30,6 +30,7 @@ class AndroidWatchBridge(
                 loading = loadingObject.toNativeWatchLoadingState(),
                 epg = epgArray.toNativeWatchPrograms(),
                 audioTracks = payload.optJSONArray("audioTracks").toNativeWatchAudioTracks(),
+                playbackTarget = payload.optJSONObject("playbackTarget").toNativeWatchPlaybackTarget(),
                 previousChannelName = payload.optString("previousChannelName"),
                 nextChannelName = payload.optString("nextChannelName"),
                 isMenuVisible = payload.optBoolean("menuVisible", false),
@@ -115,6 +116,38 @@ class AndroidWatchBridge(
                 )
             }
         }
+    }
+
+    private fun JSONObject?.toNativeWatchPlaybackTarget(): NativeWatchPlaybackTarget? {
+        if (this == null) return null
+
+        val manifestUrl = optString("manifestUrl")
+        val streamType = optString("streamType")
+        if (manifestUrl.isBlank() || streamType.isBlank()) return null
+
+        val clearKeysObject = optJSONObject("clearKeys")
+        val clearKeys = linkedMapOf<String, String>()
+        val clearKeyIterator = clearKeysObject?.keys()
+        while (clearKeyIterator?.hasNext() == true) {
+            val key = clearKeyIterator.next()
+            val value = clearKeysObject.optString(key)
+            if (key.isNotBlank() && value.isNotBlank()) {
+                clearKeys[key] = value
+            }
+        }
+
+        return NativeWatchPlaybackTarget(
+            channelId = optString("channelId"),
+            channelName = optString("channelName"),
+            manifestUrl = manifestUrl,
+            streamType = streamType,
+            authMode = optString("authMode"),
+            referer = optString("referer"),
+            userAgent = optString("userAgent"),
+            clearKeys = clearKeys,
+            sourceUrl = optString("sourceUrl"),
+            isDirectStream = optBoolean("isDirectStream", false),
+        )
     }
 
     private fun JSONObject?.toNativeWatchJioState(): NativeWatchJioState {
