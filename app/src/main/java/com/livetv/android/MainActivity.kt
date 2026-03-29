@@ -353,7 +353,7 @@ class MainActivity : AppCompatActivity() {
 
         setWebViewRenderingSuppressed(
             suppressed = opened,
-            fullyHidden = opened && !state.loading.visible,
+            fullyHidden = opened && (state.isNativePlayerActive || state.isMenuVisible || !state.loading.visible),
         )
     }
 
