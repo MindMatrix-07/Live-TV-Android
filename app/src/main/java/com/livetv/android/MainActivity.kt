@@ -1267,6 +1267,29 @@ class MainActivity : AppCompatActivity() {
                   padding-bottom: calc(${ '$' }{compact ? 26 : 40}px * var(--android-tv-scale));
                 }
 
+                body.android-tv-shell .direct-stream-menu-catcher,
+                body.android-tv-shell .direct-stream-menu-catcher:hover,
+                body.android-tv-shell .direct-stream-menu-catcher:focus,
+                body.android-tv-shell .direct-stream-menu-catcher:focus-visible,
+                body.android-tv-shell .direct-stream-menu-catcher:active {
+                  background: transparent !important;
+                  background-color: transparent !important;
+                  border: 0 !important;
+                  outline: none !important;
+                  box-shadow: none !important;
+                  color: transparent !important;
+                  opacity: 0 !important;
+                  -webkit-appearance: none !important;
+                  appearance: none !important;
+                  -webkit-tap-highlight-color: transparent !important;
+                }
+
+                body.android-tv-shell .direct-stream-menu-catcher::before,
+                body.android-tv-shell .direct-stream-menu-catcher::after {
+                  content: none !important;
+                  display: none !important;
+                }
+
                 body.android-tv-shell .glass-panel {
                   max-width: min(44vw, calc(440px * var(--android-tv-scale))) !important;
                   border-radius: calc(18px * var(--android-tv-scale)) !important;
@@ -1420,6 +1443,32 @@ class MainActivity : AppCompatActivity() {
                 }
               `;
 
+              const suppressTouchCatchers = (scopeDoc) => {
+                const touchCatchers = scopeDoc?.querySelectorAll?.('.direct-stream-menu-catcher') || [];
+                touchCatchers.forEach((catcher) => {
+                  if (!(catcher instanceof HTMLElement)) return;
+
+                  catcher.tabIndex = -1;
+                  catcher.style.background = 'transparent';
+                  catcher.style.backgroundColor = 'transparent';
+                  catcher.style.border = '0';
+                  catcher.style.outline = 'none';
+                  catcher.style.boxShadow = 'none';
+                  catcher.style.color = 'transparent';
+                  catcher.style.opacity = '0';
+                  catcher.style.webkitAppearance = 'none';
+                  catcher.style.appearance = 'none';
+                  catcher.style.webkitTapHighlightColor = 'transparent';
+
+                  if (catcher.dataset.androidTvShellFocusBound !== 'true') {
+                    catcher.dataset.androidTvShellFocusBound = 'true';
+                    catcher.addEventListener('focus', () => catcher.blur());
+                    catcher.addEventListener('pointerdown', () => catcher.blur());
+                    catcher.addEventListener('touchstart', () => catcher.blur(), { passive: true });
+                  }
+                });
+              };
+
               const suppressEmbeddedPlayerChrome = (frame) => {
                 if (!frame) return;
 
@@ -1448,6 +1497,29 @@ class MainActivity : AppCompatActivity() {
 
                     video {
                       background: #000 !important;
+                    }
+
+                    .direct-stream-menu-catcher,
+                    .direct-stream-menu-catcher:hover,
+                    .direct-stream-menu-catcher:focus,
+                    .direct-stream-menu-catcher:focus-visible,
+                    .direct-stream-menu-catcher:active {
+                      background: transparent !important;
+                      background-color: transparent !important;
+                      border: 0 !important;
+                      outline: none !important;
+                      box-shadow: none !important;
+                      color: transparent !important;
+                      opacity: 0 !important;
+                      -webkit-appearance: none !important;
+                      appearance: none !important;
+                      -webkit-tap-highlight-color: transparent !important;
+                    }
+
+                    .direct-stream-menu-catcher::before,
+                    .direct-stream-menu-catcher::after {
+                      content: none !important;
+                      display: none !important;
                     }
 
                     video::-webkit-media-controls,
@@ -1486,6 +1558,8 @@ class MainActivity : AppCompatActivity() {
                       // Best effort only.
                     }
                   }
+
+                  suppressTouchCatchers(frameDoc);
                 } catch (_error) {
                   // Ignore cross-origin or not-yet-ready iframe access.
                 }
@@ -1513,9 +1587,11 @@ class MainActivity : AppCompatActivity() {
               }
 
               installEmbeddedPlayerSuppression();
+              suppressTouchCatchers(doc);
 
               const embeddedPlayerObserver = new MutationObserver(() => {
                 installEmbeddedPlayerSuppression();
+                suppressTouchCatchers(doc);
               });
 
               embeddedPlayerObserver.observe(body, {
