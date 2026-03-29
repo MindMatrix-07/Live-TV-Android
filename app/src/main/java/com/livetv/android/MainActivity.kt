@@ -1419,6 +1419,115 @@ class MainActivity : AppCompatActivity() {
                   image-rendering: auto;
                 }
               `;
+
+              const suppressEmbeddedPlayerChrome = (frame) => {
+                if (!frame) return;
+
+                try {
+                  const frameDoc = frame.contentDocument;
+                  const frameRoot = frameDoc?.documentElement;
+                  const frameBody = frameDoc?.body;
+                  if (!frameDoc || !frameRoot || !frameBody) return;
+
+                  let frameStyle = frameDoc.getElementById('android-tv-embedded-player-style');
+                  if (!frameStyle) {
+                    frameStyle = frameDoc.createElement('style');
+                    frameStyle.id = 'android-tv-embedded-player-style';
+                    frameDoc.head?.appendChild(frameStyle);
+                  }
+
+                  frameStyle.textContent = `
+                    html, body {
+                      width: 100%;
+                      height: 100%;
+                      margin: 0;
+                      padding: 0;
+                      overflow: hidden !important;
+                      background: #000 !important;
+                    }
+
+                    video {
+                      background: #000 !important;
+                    }
+
+                    video::-webkit-media-controls,
+                    video::-webkit-media-controls-enclosure,
+                    video::-webkit-media-controls-panel,
+                    video::-webkit-media-controls-overlay-play-button,
+                    video::-webkit-media-controls-play-button,
+                    video::-webkit-media-controls-start-playback-button,
+                    video::-webkit-media-controls-timeline,
+                    video::-webkit-media-controls-current-time-display,
+                    video::-webkit-media-controls-time-remaining-display,
+                    video::-webkit-media-controls-mute-button,
+                    video::-webkit-media-controls-volume-slider,
+                    video::-webkit-media-controls-fullscreen-button {
+                      display: none !important;
+                      -webkit-appearance: none !important;
+                      opacity: 0 !important;
+                      pointer-events: none !important;
+                    }
+                  `;
+
+                  const frameVideo = frameDoc.querySelector('video');
+                  if (frameVideo) {
+                    frameVideo.controls = false;
+                    frameVideo.removeAttribute('controls');
+                    frameVideo.disablePictureInPicture = true;
+                    frameVideo.setAttribute('playsinline', '');
+                    frameVideo.setAttribute('webkit-playsinline', '');
+                    frameVideo.oncontextmenu = (event) => event.preventDefault();
+
+                    try {
+                      frameVideo.controlsList?.add?.('nodownload');
+                      frameVideo.controlsList?.add?.('nofullscreen');
+                      frameVideo.controlsList?.add?.('noplaybackrate');
+                    } catch (_error) {
+                      // Best effort only.
+                    }
+                  }
+                } catch (_error) {
+                  // Ignore cross-origin or not-yet-ready iframe access.
+                }
+              };
+
+              const installEmbeddedPlayerSuppression = () => {
+                const frames = doc.querySelectorAll('.iframe-wrapper iframe');
+                frames.forEach((frame) => {
+                  if (!(frame instanceof HTMLIFrameElement)) return;
+
+                  if (frame.dataset.androidTvShellBound !== 'true') {
+                    frame.dataset.androidTvShellBound = 'true';
+                    frame.addEventListener('load', () => suppressEmbeddedPlayerChrome(frame));
+                  }
+
+                  suppressEmbeddedPlayerChrome(frame);
+                });
+              };
+
+              if (window.__androidTvEmbeddedPlayerObserver) {
+                window.__androidTvEmbeddedPlayerObserver.disconnect();
+              }
+              if (window.__androidTvEmbeddedPlayerInterval) {
+                window.clearInterval(window.__androidTvEmbeddedPlayerInterval);
+              }
+
+              installEmbeddedPlayerSuppression();
+
+              const embeddedPlayerObserver = new MutationObserver(() => {
+                installEmbeddedPlayerSuppression();
+              });
+
+              embeddedPlayerObserver.observe(body, {
+                childList: true,
+                subtree: true,
+              });
+
+              window.__androidTvEmbeddedPlayerObserver = embeddedPlayerObserver;
+              window.__androidTvEmbeddedPlayerInterval = window.setInterval(
+                installEmbeddedPlayerSuppression,
+                800,
+              );
             })();
             """.trimIndent(),
             null,
